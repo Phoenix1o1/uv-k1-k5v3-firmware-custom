@@ -26,18 +26,30 @@ phone does not close the connection.
 
 ## CHIRP images
 
-The **CHIRP Image** launcher icon reads and writes CHIRP `.img` files for the
-F4HWN firmware ("Quansheng UV-K1 & UV-K5 V3 (F4HWN)" in CHIRP), the way
-CHIRP's F4HWN driver does. Edit the image in CHIRP on a computer; this only
-moves it to and from the radio.
+The **CHIRP Image** launcher icon reads, writes and edits CHIRP `.img` files
+for the F4HWN firmware ("Quansheng UV-K1 & UV-K5 V3 (F4HWN)" in CHIRP), the
+way CHIRP's F4HWN driver does.
 
 - **Download from radio** reads the radio and saves `uvk1-<date>.img` to
   Downloads/CHIRP. CHIRP opens it.
 - **Upload image to radio** checks that the file is a CHIRP image for this
   model, reads the radio and saves a backup (`uvk1-backup-<date>.img`, also
-  in Downloads/CHIRP), asks for confirmation, then writes 0x0000-0xA177 (channels, names, scan lists,
-  settings) as CHIRP does, reads the channel data back to verify it, and
-  restarts the radio. Calibration (0xB000 and up) is never written.
+  in Downloads/CHIRP), asks for confirmation, then writes 0x0000-0xA177
+  (channels, names, scan lists, settings) as CHIRP does, reads the channel
+  data back to verify it, and restarts the radio. Calibration (0xB000 and
+  up) is never written.
+- **View / edit an image** lists the channels (filter by scan list) and the
+  settings. Tap a channel to change its name, frequency, offset, mode, power,
+  step, tones, scan list and the other per-channel options, or delete it;
+  "Add" creates one. Tap a setting to change it: the basic, display, F4HWN,
+  side-key and scan-list settings of CHIRP's settings tab, with the radio's
+  menu names. "Save" overwrites the file or saves a copy in Downloads/CHIRP;
+  "Upload" sends the edited image to the radio as above.
+
+  Channels and settings are encoded as the driver's get_memory/set_memory and
+  get_settings/set_settings do (`chirp/F4hwnMemory.kt`); bytes it does not
+  touch are kept. Not editable here: calibration, DTMF, FM radio presets,
+  scan-list MIX selection, VFO channels.
 
 The protocol code is in `app/src/main/java/.../chirp/`; `./gradlew test` runs
 it against a simulated radio (add `-Pchirp.img=/path/file.img` to round-trip

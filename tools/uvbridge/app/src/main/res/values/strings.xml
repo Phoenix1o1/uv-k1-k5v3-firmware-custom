@@ -8,9 +8,10 @@
     <string name="webview_too_old">Android System WebView is too old. Update it from the Play Store.</string>
     <string name="chirp_label">CHIRP Image</string>
     <string name="chirp_title">CHIRP image</string>
-    <string name="chirp_intro">Reads and writes CHIRP .img files for the F4HWN firmware (UV-K1 / UV-K5 V3), as CHIRP does. Images are not edited here. Calibration is never written.</string>
+    <string name="chirp_intro">Reads, writes and edits CHIRP .img files for the F4HWN firmware (UV-K1 / UV-K5 V3), as CHIRP does. Calibration is never written.</string>
     <string name="chirp_download">Download from radio</string>
     <string name="chirp_upload">Upload image to radio</string>
+    <string name="chirp_edit">View / edit an image</string>
     <string name="chirp_write">Write</string>
     <string name="chirp_wait">Wait for the transfer to finish.</string>
     <string name="chirp_confirm">Radio firmware: %1$s\nBackup saved to Downloads/CHIRP: %2$s\n\nWrite %3$s (%4$s)?\n\nChannels, names, scan lists and settings are replaced. Do not unplug the cable until it is done.</string>

@@ -42,5 +42,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".chirp.ImageEditorActivity"
+            android:label="@string/chirp_label"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
     </application>
 </manifest>

@@ -23,11 +23,11 @@ class ChirpImage(val memory: ByteArray, val metadata: String) {
         f != 0L && f != 0xFFFFFFFFL
     }
 
-    /** Names of the scan lists 1..24 that have one. */
-    fun listNames(): List<String> = (0 until LISTS).mapNotNull { i ->
+    /** Names of the scan lists 1..24 that have one; [withEmpty]: all 24, "" when unnamed. */
+    fun listNames(withEmpty: Boolean = false): List<String> = (0 until LISTS).mapNotNull { i ->
         val raw = memory.copyOfRange(LIST_NAMES + i * 4, LIST_NAMES + i * 4 + 4)
-        raw.takeWhile { it in 0x20..0x7e }.map { it.toInt().toChar() }
-            .joinToString("").trim().ifEmpty { null }
+        val name = raw.takeWhile { it in 0x20..0x7e }.map { it.toInt().toChar() }.joinToString("").trim()
+        if (name.isEmpty() && !withEmpty) null else name
     }
 
     fun toBytes(): ByteArray {

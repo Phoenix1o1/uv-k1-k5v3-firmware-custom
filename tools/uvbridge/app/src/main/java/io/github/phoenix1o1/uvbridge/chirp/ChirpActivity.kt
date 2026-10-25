@@ -33,9 +33,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.FutureTask
 
 /**
- * Reads and writes CHIRP .img files as CHIRP's F4HWN driver does, without
- * editing them: "Download" saves the radio to an image, "Upload" writes an
- * image to the radio after saving a backup of what the radio holds.
+ * Reads and writes CHIRP .img files as CHIRP's F4HWN driver does:
+ * "Download" saves the radio to an image, "Upload" writes an image to the
+ * radio after saving a backup of what the radio holds, "View / edit" opens
+ * an image in [ImageEditorActivity].
  *
  * The transfer runs on a worker thread, which waits on the UI for the
  * confirmation and the file saves, so the sequence reads top to bottom.
@@ -85,8 +86,9 @@ class ChirpActivity : Activity() {
             setPadding(0, dp(12), 0, dp(24))
         })
         val download = Button(this).apply { setText(R.string.chirp_download); setOnClickListener { download() } }
-        val upload = Button(this).apply { setText(R.string.chirp_upload); setOnClickListener { pickImage() } }
-        buttons = listOf(download, upload)
+        val upload = Button(this).apply { setText(R.string.chirp_upload); setOnClickListener { pickImage(PICK_IMAGE) } }
+        val edit = Button(this).apply { setText(R.string.chirp_edit); setOnClickListener { pickImage(PICK_EDIT) } }
+        buttons = listOf(download, upload, edit)
         buttons.forEach { root.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)) }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 1000 }
         root.addView(progress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -130,18 +132,30 @@ class ChirpActivity : Activity() {
             "The radio restarts; the backup is $backupName."
     }
 
-    private fun pickImage() {
+    private fun pickImage(request: Int) {
         val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
-        @Suppress("DEPRECATION") startActivityForResult(pick, PICK_IMAGE)
+        @Suppress("DEPRECATION") startActivityForResult(pick, request)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        val uri = data?.data
-        if (requestCode != PICK_IMAGE || resultCode != RESULT_OK || uri == null) return
+        if (resultCode != RESULT_OK || data == null) return
         try {
-            val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-            upload(ChirpImage.parse(bytes), displayName(uri))
+            when (requestCode) {
+                PICK_IMAGE, PICK_EDIT -> {
+                    val uri = data.data ?: return
+                    val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                    val image = ChirpImage.parse(bytes)                 // refuses other models
+                    if (requestCode == PICK_IMAGE) upload(image, displayName(uri))
+                    else @Suppress("DEPRECATION") startActivityForResult(
+                        ImageEditorActivity.intent(this, bytes, displayName(uri), uri), EDITED)
+                }
+                // "Upload" in the editor: the edited image, saved or not.
+                EDITED -> {
+                    val bytes = data.getByteArrayExtra(ImageEditorActivity.EXTRA_IMAGE) ?: return
+                    upload(ChirpImage.parse(bytes), data.getStringExtra(ImageEditorActivity.EXTRA_NAME) ?: "image")
+                }
+            }
         } catch (e: Exception) {
             status.text = e.message ?: e.toString()
         }
@@ -259,6 +273,8 @@ class ChirpActivity : Activity() {
     companion object {
         private const val ACTION_PERMISSION = "io.github.phoenix1o1.uvbridge.CHIRP_USB_PERMISSION"
         private const val PICK_IMAGE = 1
+        private const val PICK_EDIT = 2
+        private const val EDITED = 3
         /** Images and backups go to Downloads/CHIRP. */
         private const val FOLDER = "CHIRP"
     }
