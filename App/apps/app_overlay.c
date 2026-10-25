@@ -127,6 +127,7 @@ static struct {
 #ifdef ENABLE_FEAT_F4HWN_OVERLAY_BEAM
     uint16_t beam_pending_channel;
 #endif
+    uint16_t mr_pending;   /* mr_stage: memory channel plus one, 0 = none */
     uint8_t run_slot;
     uint8_t cfg_len;       /* staged length; 0 = nothing to commit */
     uint8_t cfg_target_slot;
@@ -571,6 +572,112 @@ static void app_beam_draw(const char *status)
     UI_PrintStringSmallBold(status, 2, LCD_WIDTH - 1u, line);
 }
 #endif
+
+/* ---- API level 4: memory channels and scan lists ----
+ * An app cannot read the memories itself (it runs from the flash sector
+ * cache) nor write the flash while it runs, so the loader offers these.
+ * Reads use the existing helpers, which read with PY25Q16_ReadBuffer: it
+ * bypasses the sector cache and follows the active configuration bank.
+ * Tuning is staged by mr_stage and applied by app_mr_commit() once the app
+ * has returned, like beam_save / app_beam_commit(). */
+
+/* Scan list of memory ch, or APP_MR_EMPTY / APP_MR_END. */
+static int16_t app_mr_list(uint16_t ch)
+{
+    if (!IS_MR_CHANNEL(ch))
+        return APP_MR_END;
+    if (!RADIO_CheckValidChannel(ch, false, 0))
+        return APP_MR_EMPTY;
+    /* MR_CHANNELS_LIST + 1 (SCAN_LIST_MODE_ALL) puts the channel in every
+     * list, as RADIO_IsChannelInScanList() reads it; above, in none. */
+    const uint8_t list = MR_GetChannelAttributes(ch)->scanlist;
+    return list <= MR_CHANNELS_LIST + 1u ? list : 0;
+}
+
+/* Memory ch in the same wire struct beam_get fills for the VFO. */
+static bool app_mr_read(uint16_t ch, app_beam_channel_t *out)
+{
+    ChannelScanDisplayInfo_t info;
+    if (out == NULL || app_mr_list(ch) < 0 ||
+        !SETTINGS_FetchChannelScanDisplayInfo(ch, &info))
+        return false;
+
+    const ChannelAttributes_t *att = MR_GetChannelAttributes(ch);
+    memset(out, 0, sizeof(*out));
+    out->rx_frequency        = info.rx.Frequency;
+    out->tx_offset_frequency = info.offset;
+    out->rx_code             = info.rx.Code;
+    out->tx_code             = info.tx.Code;
+    out->rx_codetype         = info.rx.CodeType;
+    out->tx_codetype         = info.tx.CodeType;
+    out->modulation          = info.modulation;
+    out->tx_offset_direction = info.txOffsetFrequencyDirection;
+    out->tx_lock             = info.txLock;
+    out->busy_channel_lock   = info.busyChannelLock;
+    out->output_power        = info.outputPower;
+    out->channel_bandwidth   = info.channelBandwidth;
+    out->frequency_reverse   = info.frequencyReverse;
+    out->dtmf_ptt_id_mode    = info.dtmfPttIdTxMode;
+#ifdef ENABLE_DTMF_CALLING
+    out->dtmf_decoding_enable = info.dtmfDecodingEnable;
+#endif
+    out->step_setting        = info.stepSetting;
+    out->band                = att->band;
+    out->scanlist            = att->scanlist;
+    out->compander           = att->compander;
+    SETTINGS_FetchChannelName(out->name, ch);   /* 10 chars at most, NUL-terminated */
+    return true;
+}
+
+/* Name of scan list 1..24 (4 chars in flash, 0xFF when unset) into out[5]. */
+static void app_list_name(uint8_t list, char *out)
+{
+    uint8_t n = 0;
+    if (list >= 1u && list <= MR_CHANNELS_LIST) {
+        const char *name = gListName[list - 1u];
+        while (n < sizeof(gListName[0]) && name[n] >= 32 && name[n] < 127) {
+            out[n] = name[n];
+            n++;
+        }
+        while (n && out[n - 1u] == ' ')
+            n--;
+    }
+    out[n] = '\0';
+}
+
+/* Remember the memory to select; gAppVfoExit makes the Apps menu return to
+ * the main screen, where the new channel shows. */
+static bool app_mr_stage(uint16_t ch)
+{
+    if (app_state.mr_pending || app_mr_list(ch) < 0)
+        return false;
+    app_state.mr_pending = ch + 1u;
+    gAppVfoExit = true;
+    return true;
+}
+
+/* As channelMove() (app/main.c) does for a channel number typed on the keypad;
+ * called only after the overlay has returned. */
+static void app_mr_commit(void)
+{
+    if (!app_state.mr_pending)
+        return;
+    const uint16_t ch  = app_state.mr_pending - 1u;
+    const uint8_t  vfo = gEeprom.TX_VFO;
+    app_state.mr_pending = 0;
+
+    gEeprom.MrChannel[vfo]     = ch;
+    gEeprom.ScreenChannel[vfo] = ch;
+#ifdef ENABLE_FEAT_F4HWN_RESCUE_OPS
+    gRemoveOffset = false;
+    gPowerHigh    = false;
+#endif
+    RADIO_ConfigureChannel(vfo, VFO_CONFIGURE_RELOAD);
+    RADIO_SelectVfos();
+    RADIO_SetupRegisters(true);
+    SETTINGS_SaveVfoIndices();
+    PY25Q16_InvalidateCache();
+}
 
 /* ---- radio wrappers ---- */
 static int16_t  app_rssi_dbm(void)     { return BK4819_GetRSSI_dBm() + dBmCorrTable[gRxVfo->Band]; }
@@ -1322,6 +1429,10 @@ static const app_api_t app_api = {
 #ifdef ENABLE_FEAT_F4HWN_OVERLAY_BEAM
     .vfo_stage           = app_vfo_stage,
 #endif
+    .mr_list             = app_mr_list,
+    .mr_read             = app_mr_read,
+    .list_name           = app_list_name,
+    .mr_stage            = app_mr_stage,
 };
 
 /* Hand-off guards: a chain of apps that hand off to each other for ever (a
@@ -1393,6 +1504,7 @@ static uint8_t app_launch(uint8_t slot)
 #ifdef ENABLE_FEAT_F4HWN_OVERLAY_BEAM
     app_state.beam_dirty = false;
 #endif
+    app_state.mr_pending = 0;
 
     app_state.allow_screen_saver = (h.flags & APP_FLAG_SCREEN_SAVER) != 0;
     app_state.screen_saver_wake = false;
@@ -1457,6 +1569,7 @@ static uint8_t app_launch(uint8_t slot)
 #ifdef ENABLE_FEAT_F4HWN_OVERLAY_BEAM
     app_beam_commit();
 #endif
+    app_mr_commit();
 
     /* Commit ordinary per-app config, or the bounded target asset selected by
      * a validated proxy descriptor.  Both paths run only after app_main exits. */
