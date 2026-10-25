@@ -52,9 +52,11 @@
  *      offset; serial_read / serial_write / serial_ctl (the USB-C serial
  *      port, K-plug reserved; APP_CAP_SERIAL); blit_page, lcd_feed,
  *      viewer_update (the LCD without the K5Viewer side effect), vfo_stage
- *      (deferred update of the current VFO) */
+ *      (deferred update of the current VFO)
+ *   4  mr_list, mr_read, list_name: the memory channels and the scan lists,
+ *      read-only; mr_stage (select a memory channel on exit) */
 #define APP_ABI_MAJOR  1u
-#define APP_API_LEVEL  3u
+#define APP_API_LEVEL  4u
 
 /* App name length in app_header_t, the name handoff() takes (API level 3). */
 #define APP_NAME_LEN    16
@@ -441,7 +443,34 @@ typedef struct app_api {
      * beam_save, so start from beam_get and change what is needed. NULL on a
      * build without the BEAM bridge. */
     bool     (*vfo_stage)(const app_beam_channel_t *ch);
+
+    /* ---- API level 4: memory channels and scan lists ----
+     * Read-only views of the memory channels of the active configuration bank,
+     * as CHIRP writes them, plus one staged channel change.
+     * mr_list: the scan list of memory ch (0-based): 1..APP_MR_LISTS, 0 when
+     * the channel is in no list, APP_MR_EVERY when it is in every list (it is
+     * then scanned with each of them), APP_MR_EMPTY for an empty or invalid memory,
+     * APP_MR_END past the last memory (a loop over the memories stops there).
+     * mr_read: memory ch as beam_get exports the VFO (frequency, offset,
+     * codes, modulation, power, step, scan list; name NUL-terminated within
+     * its 16 bytes); false, *out untouched, for an empty or invalid memory.
+     * list_name: the name of scan list 1..APP_MR_LISTS into out[5], trailing
+     * spaces trimmed, "" when the list has none or list is out of range.
+     * mr_stage: select memory ch on the current VFO once app_main() returns,
+     * then go to the main screen, as a channel number typed on the keypad.
+     * One per run: false when a memory is already staged or ch is empty.
+     * Applied after beam_save / vfo_stage if an app also used those. */
+    int16_t  (*mr_list)(uint16_t ch);
+    bool     (*mr_read)(uint16_t ch, app_beam_channel_t *out);
+    void     (*list_name)(uint8_t list, char *out);
+    bool     (*mr_stage)(uint16_t ch);
 } app_api_t;
+
+/* mr_list results besides a list number (API level 4). */
+#define APP_MR_LISTS 24
+#define APP_MR_EVERY (APP_MR_LISTS + 1)
+#define APP_MR_EMPTY (-1)
+#define APP_MR_END   (-2)
 
 /* Serial ports and serial_ctl state bits (API level 3). */
 enum { APP_SERIAL_USB = 0, APP_SERIAL_KPLUG = 1 };
@@ -461,7 +490,9 @@ _Static_assert(offsetof(app_api_t, handoff) == 356u &&
                offsetof(app_api_t, serial_read) == 368u &&
                offsetof(app_api_t, blit_page) == 380u &&
                offsetof(app_api_t, vfo_stage) == 392u &&
-               sizeof(app_api_t) == 396u,
+               offsetof(app_api_t, mr_list) == 396u &&
+               offsetof(app_api_t, mr_stage) == 408u &&
+               sizeof(app_api_t) == 412u,
                "app_api_t is append-only: every edition shares this layout");
 
 /* Wrap-safe modular ordering for deadlines less than half a cycle-counter
