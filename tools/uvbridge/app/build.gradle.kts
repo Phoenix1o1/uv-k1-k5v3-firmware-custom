@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "io.github.phoenix1o1.uvbridge"
-        minSdk = 29          // Android 10: MediaStore Downloads without storage permission
+        minSdk = 30          // Android 11: WindowInsets.Type, insetsController
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     buildTypes {
