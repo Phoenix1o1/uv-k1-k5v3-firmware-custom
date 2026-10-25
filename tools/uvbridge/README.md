@@ -14,9 +14,9 @@ K5Viewer and RF Log run as they do on a computer.
 
 1. Install the APK from the Releases page (sideload; it is not on the Play
    Store). Android 11 or later.
-2. Plug the cable into the phone (USB-C OTG adapter if needed) and the radio.
-   If Android asks which app to open, pick UV Bridge; "Always" keeps the USB
-   permission for that cable.
+2. Connect the radio to the phone with a USB cable through a USB OTG adapter
+   (see Cables below). If Android asks which app to open, pick UV Bridge;
+   "Always" keeps the USB permission for that cable.
 3. In UV Studio, start any action that connects: UV Bridge lists the USB
    serial devices, then Android asks for permission.
 
@@ -24,8 +24,19 @@ Files UV Studio offers for download (calibration dumps, logs...) are saved to
 **Downloads**. The screen stays on while the app is open, and rotating the
 phone does not close the connection.
 
-Supported adapters: CH340/CH341, CP210x, FTDI, PL2303, and USB CDC devices.
-Tested with a 2-pin (K-plug) programming cable on a UV-K1(8).
+## Cables
+
+| Connection | Result |
+|---|---|
+| USB cable through a USB OTG adapter (USB-A socket to USB-C plug) | Works |
+| Straight USB-C to USB-C cable between phone and radio | Does not work |
+
+Tested on a OnePlus 13 with a UV-K1(8). With the straight USB-C
+cable the phone does not get a usable serial connection to the radio, so use
+the OTG adapter.
+
+Supported USB serial chips: CH340/CH341, CP210x, FTDI, PL2303, and USB CDC
+devices.
 
 ## How it works
 
