@@ -16,6 +16,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -29,6 +30,7 @@ import androidx.webkit.WebViewFeature
  */
 class MainActivity : Activity() {
 
+    private lateinit var root: FrameLayout
     private lateinit var web: WebView
     private lateinit var bridge: SerialBridge
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -46,8 +48,11 @@ class MainActivity : Activity() {
             return
         }
 
+        // The WebView sits in a container that takes the system-bar padding:
+        // padding on the WebView itself does not move the page.
         web = WebView(this)
-        setContentView(web)
+        root = FrameLayout(this).apply { addView(web) }
+        setContentView(root)
         keepClearOfSystemBars()
         web.settings.apply {
             javaScriptEnabled = true
@@ -74,8 +79,10 @@ class MainActivity : Activity() {
         WebViewCompat.addWebMessageListener(web, "UVBridgeNative", origins) { _, message, _, _, reply ->
             message.data?.let { bridge.onMessage(it, reply) }
         }
-        val polyfill = assets.open("serial-polyfill.js").bufferedReader().use { it.readText() }
-        WebViewCompat.addDocumentStartJavaScript(web, polyfill, origins)
+        for (script in listOf("serial-polyfill.js", "page-fixes.js")) {
+            val source = assets.open(script).bufferedReader().use { it.readText() }
+            WebViewCompat.addDocumentStartJavaScript(web, source, origins)
+        }
 
         web.webViewClient = object : WebViewClient() {
             // Stay on UV Studio; any other site opens in the browser.
@@ -125,19 +132,19 @@ class MainActivity : Activity() {
     /** Android 15 draws apps edge to edge: pad the page off the status bar,
      *  the navigation bar and the camera cutout. */
     private fun keepClearOfSystemBars() {
-        web.setOnApplyWindowInsetsListener { v, insets ->
+        root.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or
                 WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
+            WindowInsets.CONSUMED      // the page itself must not pad again
         }
     }
 
     /** The page's background colour, from the polyfill: paint it behind the
      *  bars, with icons that stay readable on it. */
     private fun setBarColor(color: Int) {
+        root.setBackgroundColor(color)
         web.setBackgroundColor(color)
-        window.decorView.setBackgroundColor(color)
         val r = (color shr 16) and 0xff; val g = (color shr 8) and 0xff; val b = color and 0xff
         val light = r * 299 + g * 587 + b * 114 > 128_000          // perceived brightness
         val dark = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or

@@ -12,7 +12,8 @@ K5Viewer and RF Log run as they do on a computer.
 
 ## Use
 
-1. Install the APK (sideload; it is not on the Play Store).
+1. Install the APK from the Releases page (sideload; it is not on the Play
+   Store). Android 11 or later.
 2. Plug the cable into the phone (USB-C OTG adapter if needed) and the radio.
    If Android asks which app to open, pick UV Bridge; "Always" keeps the USB
    permission for that cable.
@@ -39,9 +40,14 @@ Tested with a 2-pin (K-plug) programming cable on a UV-K1(8).
   replug events.
 - The bridge is a WebMessageListener restricted to `https://armel.github.io`;
   other sites cannot reach it, and links to them open in the browser.
-- The WebView lays the page out as mobile Chrome does (viewport tag honoured,
-  zoomed out when the page is wider than the screen) and keeps it clear of the
-  status bar, navigation bar and camera cutout.
+- `app/src/main/assets/page-fixes.js` adds a little CSS for phone-width
+  screens: UV Studio's top bar actions and Live Viewer screen have fixed
+  widths (424 and 524 CSS px) wider than a phone, so below 600 px the bar
+  wraps and the screen scales down. Styling only.
+- The page sits in a container padded off the status bar, navigation bar and
+  camera cutout, painted in the page's colour. The WebView lays the page out
+  as mobile Chrome does, at 100 % text size (the system font size would
+  enlarge the text past what the layout allows; pinch zoom works).
 
 ## Build
 
