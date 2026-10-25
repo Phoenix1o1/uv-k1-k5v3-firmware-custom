@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.phoenix1o1.uvbridge"
         minSdk = 30          // Android 11: WindowInsets.Type, insetsController
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.3.1"
+        versionCode = 5
+        versionName = "0.4.0"
     }
 
     buildTypes {
@@ -32,4 +32,11 @@ android {
 dependencies {
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.github.mik3y:usb-serial-for-android:3.8.1")
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.withType<Test> {
+    // A real CHIRP image for the round-trip test: ./gradlew test -Pchirp.img=/path/file.img
+    project.findProperty("chirp.img")?.let { systemProperty("chirp.img", it) }
+    testLogging { showStandardStreams = true }
 }

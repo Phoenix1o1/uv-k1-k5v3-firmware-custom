@@ -24,11 +24,31 @@ Files UV Studio offers for download (calibration dumps, logs...) are saved to
 **Downloads**. The screen stays on while the app is open, and rotating the
 phone does not close the connection.
 
+## CHIRP images
+
+The **CHIRP Image** launcher icon reads and writes CHIRP `.img` files for the
+F4HWN firmware ("Quansheng UV-K1 & UV-K5 V3 (F4HWN)" in CHIRP), the way
+CHIRP's F4HWN driver does. Edit the image in CHIRP on a computer; this only
+moves it to and from the radio.
+
+- **Download from radio** reads the radio and saves `uvk1-<date>.img` to
+  Downloads. CHIRP opens it.
+- **Upload image to radio** checks that the file is a CHIRP image for this
+  model, reads the radio and saves a backup (`uvk1-backup-<date>.img`), asks
+  for confirmation, then writes 0x0000-0xA177 (channels, names, scan lists,
+  settings) as CHIRP does, reads the channel data back to verify it, and
+  restarts the radio. Calibration (0xB000 and up) is never written.
+
+The protocol code is in `app/src/main/java/.../chirp/`; `./gradlew test` runs
+it against a simulated radio (add `-Pchirp.img=/path/file.img` to round-trip
+one of your own images).
+
 ## Cables
 
 | Connection | Result |
 |---|---|
 | USB cable through a USB OTG adapter (USB-A socket to USB-C plug) | Works |
+| 2-pin (Kenwood plug) programming cable through a USB OTG adapter | Works |
 | Straight USB-C to USB-C cable between phone and radio | Does not work |
 
 Tested on a OnePlus 13 with a UV-K1(8). With the straight USB-C

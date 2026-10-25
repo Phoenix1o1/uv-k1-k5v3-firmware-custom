@@ -30,5 +30,17 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_serial_devices" />
         </activity>
+
+        <!-- A second launcher icon: CHIRP .img download / upload. -->
+        <activity
+            android:name=".chirp.ChirpActivity"
+            android:label="@string/chirp_label"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>
