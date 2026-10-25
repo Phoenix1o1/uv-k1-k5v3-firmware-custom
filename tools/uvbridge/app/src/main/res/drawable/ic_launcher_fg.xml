@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A handheld radio with an antenna, on the adaptive-icon 108dp canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF" android:pathData="M60,24h4v14h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M40,38h28a4,4 0,0 1,4 4v38a4,4 0,0 1,-4 4h-28a4,4 0,0 1,-4 -4v-38a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#A8C87C" android:pathData="M42,44h24v14h-24z" />
+    <path android:fillColor="#1F2A1A" android:pathData="M44,62h6v4h-6zM51,62h6v4h-6zM58,62h6v4h-6zM44,68h6v4h-6zM51,68h6v4h-6zM58,68h6v4h-6zM44,74h6v4h-6zM51,74h6v4h-6zM58,74h6v4h-6z" />
+</vector>

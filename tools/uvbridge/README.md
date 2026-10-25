@@ -1,0 +1,66 @@
+# UV Bridge
+
+UV Studio on Android, with a USB programming cable.
+
+[UV Studio](https://armel.github.io/uvstudio/) talks to the radio through Web
+Serial, which Chrome for Android does not provide for every USB serial adapter.
+UV Bridge opens the live UV Studio site in a WebView and supplies the Web
+Serial API itself, on top of
+[usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android).
+UV Studio is unchanged: firmware flashing, firmware slots, apps, calibration,
+K5Viewer and RF Log run as they do on a computer.
+
+## Use
+
+1. Install the APK (sideload; it is not on the Play Store).
+2. Plug the cable into the phone (USB-C OTG adapter if needed) and the radio.
+   If Android asks which app to open, pick UV Bridge; "Always" keeps the USB
+   permission for that cable.
+3. In UV Studio, start any action that connects: UV Bridge lists the USB
+   serial devices, then Android asks for permission.
+
+Files UV Studio offers for download (calibration dumps, logs...) are saved to
+**Downloads**. The screen stays on while the app is open, and rotating the
+phone does not close the connection.
+
+Supported adapters: CH340/CH341, CP210x, FTDI, PL2303, and USB CDC devices.
+Tested with a 2-pin (K-plug) programming cable on a UV-K1(8).
+
+## How it works
+
+- `app/src/main/assets/serial-polyfill.js` is injected before UV Studio's own
+  scripts and defines `navigator.serial`: `requestPort()`, `getPorts()`, the
+  `connect` / `disconnect` events, and `SerialPort` with `open()`, `close()`,
+  `getInfo()`, `readable` and `writable`. It also saves blob downloads, which
+  a WebView cannot save itself, and reports the page colour so the system bars
+  match UV Studio's light or dark theme.
+- `SerialBridge.kt` is the native side: device list, USB permission, port
+  settings, reads on a background thread, writes off the UI thread, unplug and
+  replug events.
+- The bridge is a WebMessageListener restricted to `https://armel.github.io`;
+  other sites cannot reach it, and links to them open in the browser.
+- The WebView lays the page out as mobile Chrome does (viewport tag honoured,
+  zoomed out when the page is wider than the screen) and keeps it clear of the
+  status bar, navigation bar and camera cutout.
+
+## Build
+
+Requires JDK 17+ and the Android SDK (platform 35).
+
+```
+echo "sdk.dir=/path/to/android-sdk" > local.properties
+./gradlew assembleDebug
+# app/build/outputs/apk/debug/app-debug.apk
+```
+
+`test/polyfill-test.mjs` runs the polyfill in Node against a fake echo device:
+
+```
+node test/polyfill-test.mjs app/src/main/assets/serial-polyfill.js
+```
+
+## Safety
+
+Flash with the phone charged and a short, solid cable. Try a calibration dump
+and a firmware slot write before full DFU flashing, and keep a computer at hand
+in case a flash has to be redone. Back up your calibration first.

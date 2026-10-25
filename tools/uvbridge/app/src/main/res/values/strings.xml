@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">UV Bridge</string>
+    <string name="pick_device">Select the radio\'s serial port</string>
+    <string name="saved">Saved to Downloads: %1$s</string>
+    <string name="save_failed">Could not save the file: %1$s</string>
+    <string name="downloading">Downloading %1$s</string>
+    <string name="webview_too_old">Android System WebView is too old. Update it from the Play Store.</string>
+</resources>
