@@ -110,7 +110,7 @@ class ChirpActivity : Activity() {
         val image = clone.download(::showProgress)
         val name = "uvk1-${stamp()}.img"
         save(name, image)
-        "Saved to Downloads: $name\n${describe(image)}"
+        "Saved to Downloads/$FOLDER: $name\n${describe(image)}"
     }
 
     private fun upload(image: ChirpImage, fileName: String) = withRadio { clone ->
@@ -203,7 +203,7 @@ class ChirpActivity : Activity() {
     /** Saves on the UI thread (FileSaver shows a toast); throws if it failed. */
     private fun save(name: String, image: ChirpImage) {
         val result = CompletableFuture<String?>()
-        runOnUiThread { files.save(name, image.toBytes(), { result.complete(null) }, { result.complete(it) }) }
+        runOnUiThread { files.save(name, image.toBytes(), { result.complete(null) }, { result.complete(it) }, FOLDER) }
         result.get()?.let { throw RadioException("Could not save $name: $it") }
     }
 
@@ -259,5 +259,7 @@ class ChirpActivity : Activity() {
     companion object {
         private const val ACTION_PERMISSION = "io.github.phoenix1o1.uvbridge.CHIRP_USB_PERMISSION"
         private const val PICK_IMAGE = 1
+        /** Images and backups go to Downloads/CHIRP. */
+        private const val FOLDER = "CHIRP"
     }
 }

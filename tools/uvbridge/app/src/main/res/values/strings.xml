@@ -13,5 +13,5 @@
     <string name="chirp_upload">Upload image to radio</string>
     <string name="chirp_write">Write</string>
     <string name="chirp_wait">Wait for the transfer to finish.</string>
-    <string name="chirp_confirm">Radio firmware: %1$s\nBackup saved to Downloads: %2$s\n\nWrite %3$s (%4$s)?\n\nChannels, names, scan lists and settings are replaced. Do not unplug the cable until it is done.</string>
+    <string name="chirp_confirm">Radio firmware: %1$s\nBackup saved to Downloads/CHIRP: %2$s\n\nWrite %3$s (%4$s)?\n\nChannels, names, scan lists and settings are replaced. Do not unplug the cable until it is done.</string>
 </resources>

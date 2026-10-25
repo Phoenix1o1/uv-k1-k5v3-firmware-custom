@@ -32,10 +32,10 @@ CHIRP's F4HWN driver does. Edit the image in CHIRP on a computer; this only
 moves it to and from the radio.
 
 - **Download from radio** reads the radio and saves `uvk1-<date>.img` to
-  Downloads. CHIRP opens it.
+  Downloads/CHIRP. CHIRP opens it.
 - **Upload image to radio** checks that the file is a CHIRP image for this
-  model, reads the radio and saves a backup (`uvk1-backup-<date>.img`), asks
-  for confirmation, then writes 0x0000-0xA177 (channels, names, scan lists,
+  model, reads the radio and saves a backup (`uvk1-backup-<date>.img`, also
+  in Downloads/CHIRP), asks for confirmation, then writes 0x0000-0xA177 (channels, names, scan lists,
   settings) as CHIRP does, reads the channel data back to verify it, and
   restarts the radio. Calibration (0xB000 and up) is never written.
 
