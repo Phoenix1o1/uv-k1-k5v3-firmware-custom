@@ -61,7 +61,7 @@ class RadioCloneTest {
     @Test fun writesWithoutHelloAreIgnoredByTheRadio() {
         val radio = FakeRadio()
         try {
-            K5Protocol(radio, timeoutMs = 300).writeMem(0, ByteArray(8))
+            K5Protocol(radio, timeoutMs = 300, writeTimeoutMs = 300).writeMem(0, ByteArray(8))
             fail("expected a timeout")
         } catch (e: RadioException) { }
         assertEquals(0xff.toByte(), radio.mem[0])
@@ -84,6 +84,36 @@ class RadioCloneTest {
             assertTrue(e.message!!.contains("UV-K5"))
         }
         try { ChirpImage.parse(ByteArray(100)); fail() } catch (e: IllegalArgumentException) { }
+    }
+
+    // Writes wait while the radio erases flash: seconds per block at worst.
+    @Test fun slowWritesAreWaitedFor() {
+        val radio = FakeRadio().apply { writeDelayMs = 1500 }
+        val k5 = K5Protocol(radio, timeoutMs = 500, writeTimeoutMs = 3000).apply { hello() }
+        k5.writeMem(0x40, ByteArray(16) { 1 })
+        assertEquals(1, radio.writes)
+    }
+
+    // A lost reply is retried; writing the same block again is harmless.
+    @Test fun lostWriteReplyIsRetried() {
+        val radio = FakeRadio().apply { dropReplyOfWrite += 3 }
+        val image = syntheticImage()
+        val clone = RadioClone(K5Protocol(radio, timeoutMs = 300, writeTimeoutMs = 300))
+        clone.connect()
+        assertTrue(clone.upload(image) { _, _, _ -> }.isEmpty())
+        assertArrayEquals(image.memory.copyOf(ChirpImage.PROG_SIZE), radio.mem.copyOf(ChirpImage.PROG_SIZE))
+        assertEquals((ChirpImage.PROG_SIZE + ChirpImage.BLOCK - 1) / ChirpImage.BLOCK + 1, radio.writes)
+    }
+
+    // A reply that comes after the retry was sent leaves a second, stale reply
+    // behind; the next commands skip it.
+    @Test fun lateReplyIsSkipped() {
+        val radio = FakeRadio().apply { writeDelayMs = 500; slowWrites = 1 }
+        val k5 = K5Protocol(radio, timeoutMs = 300, writeTimeoutMs = 300).apply { hello() }
+        k5.writeMem(0x00, ByteArray(8) { 1 })
+        k5.writeMem(0x80, ByteArray(8) { 2 })
+        assertArrayEquals(ByteArray(8) { 1 }, k5.readMem(0x00, 8))
+        assertArrayEquals(ByteArray(8) { 2 }, k5.readMem(0x80, 8))
     }
 
     /** A real image, when given: -Dchirp.img=/path/to/file.img (not committed). */
@@ -119,6 +149,13 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
     var wasReset = false
     var highestWrite = 0
     var lastPacket = ByteArray(0)
+    var writes = 0
+    /** Reply delay for the first [slowWrites] writes, as while erasing flash. */
+    var writeDelayMs = 0L
+    var slowWrites = Int.MAX_VALUE
+    /** Writes (1-based) whose reply is lost. */
+    val dropReplyOfWrite = mutableSetOf<Int>()
+    private var readyAt = 0L
     private var timestamp: ByteArray? = null
     private val out = ArrayDeque<Byte>()
     private val rnd = Random(1)
@@ -153,6 +190,9 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
                 val off = u16(p, 4); val size = p[6].toInt() and 0xff
                 for (i in 0 until size / 8 * 8) mem[off + i] = p[12 + i]
                 highestWrite = maxOf(highestWrite, off + size)
+                writes++
+                if (writes in dropReplyOfWrite) return
+                if (writes <= slowWrites) readyAt = maxOf(readyAt, System.currentTimeMillis() + writeDelayMs)
                 reply(0x051E, byteArrayOf(p[4], p[5]))
             }
             0x05DD -> wasReset = true
@@ -169,7 +209,7 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
     }
 
     override fun read(buf: ByteArray, timeoutMs: Int): Int {
-        if (out.isEmpty()) { Thread.sleep(minOf(timeoutMs, 20).toLong()); return 0 }
+        if (out.isEmpty() || System.currentTimeMillis() < readyAt) { Thread.sleep(minOf(timeoutMs, 20).toLong()); return 0 }
         val n = minOf(buf.size, out.size, 1 + rnd.nextInt(40))
         for (i in 0 until n) buf[i] = out.removeFirst()
         return n

@@ -9,7 +9,8 @@ interface SerialLink {
     fun read(buf: ByteArray, timeoutMs: Int): Int
 }
 
-class RadioException(message: String) : IOException(message)
+open class RadioException(message: String) : IOException(message)
+class Timeout : RadioException("No answer from the radio (timeout)")
 
 /**
  * The Quansheng UV-K5 / UV-K1 programming protocol, as the F4HWN CHIRP driver
@@ -19,7 +20,11 @@ class RadioException(message: String) : IOException(message)
  * Payload: message id (LE u16), body length (LE u16), body.
  * Replies use the same frame; their CRC is not meaningful and is ignored.
  */
-class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000) {
+class K5Protocol(
+    private val link: SerialLink,
+    private val timeoutMs: Int = 6000,          // CHIRP's serial timeout
+    private val writeTimeoutMs: Int = 15000,    // flash erases make writes slow
+) {
 
     /** Says hello; returns the firmware version string. Writes need this first. */
     fun hello(): String {
@@ -41,24 +46,42 @@ class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000
     fun readMem(offset: Int, length: Int): ByteArray {
         val cmd = byteArrayOf(0x1b, 0x05, 0x08, 0x00,
             lo(offset), hi(offset), length.toByte(), 0) + TIMESTAMP
-        send(cmd)
-        val r = receive()
-        if (r.size < 8 + length || r[0] != 0x1c.toByte() || r[1] != 0x05.toByte() ||
-            r[4] != lo(offset) || r[5] != hi(offset))
-            throw RadioException("Bad answer to read at 0x%04X".format(offset))
+        val r = exchange(cmd, timeoutMs) { it.size >= 8 + length && isReply(it, 0x1c, offset) }
+            ?: throw RadioException("No answer to read at 0x%04X (timeout)".format(offset))
         return r.copyOfRange(8, 8 + length)
     }
 
-    /** Writes [data] (≤ 128 bytes, a multiple of 8) at [offset]. */
+    /**
+     * Writes [data] (≤ 128 bytes, a multiple of 8) at [offset].
+     * The radio answers once the block is in flash, which can take seconds
+     * when it has to erase sectors (up to 16 erases of ~0.3 s per block).
+     */
     fun writeMem(offset: Int, data: ByteArray) {
         val n = data.size
         val cmd = byteArrayOf(0x1d, 0x05, (n + 8).toByte(), 0,
             lo(offset), hi(offset), n.toByte(), 1 /* allow password area */) + TIMESTAMP + data
-        send(cmd)
-        val r = receive()
-        if (r.size < 6 || r[0] != 0x1e.toByte() || r[4] != lo(offset) || r[5] != hi(offset))
-            throw RadioException("Bad answer to write at 0x%04X".format(offset))
+        exchange(cmd, writeTimeoutMs) { isReply(it, 0x1e, offset) }
+            ?: throw RadioException("No answer to write at 0x%04X (timeout)".format(offset))
     }
+
+    /**
+     * Sends [cmd] and waits for the reply [matches] accepts, sending again on
+     * a timeout (reads and writes are idempotent). Replies that do not match,
+     * such as a late answer to an earlier try, are skipped.
+     */
+    private fun exchange(cmd: ByteArray, timeout: Int, matches: (ByteArray) -> Boolean): ByteArray? {
+        repeat(TRIES) {
+            send(cmd)
+            val deadline = System.currentTimeMillis() + timeout
+            try {
+                while (true) receive(deadline).let { if (matches(it)) return it }
+            } catch (e: Timeout) { }
+        }
+        return null
+    }
+
+    private fun isReply(r: ByteArray, id: Int, offset: Int) =
+        r.size >= 6 && r[0] == id.toByte() && r[1] == 0x05.toByte() && r[4] == lo(offset) && r[5] == hi(offset)
 
     /** Restarts the radio, as CHIRP does after an upload. No answer. */
     fun reset() = send(byteArrayOf(0xdd.toByte(), 0x05, 0x00, 0x00))
@@ -68,8 +91,7 @@ class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000
     fun send(payload: ByteArray) = link.write(frame(payload))
 
     /** Next reply payload, deobfuscated. Skips bytes until a frame header. */
-    fun receive(): ByteArray {
-        val deadline = System.currentTimeMillis() + timeoutMs
+    fun receive(deadline: Long = System.currentTimeMillis() + timeoutMs): ByteArray {
         var b = readByte(deadline)
         while (true) {
             if (b != 0xAB) { b = readByte(deadline); continue }
@@ -80,9 +102,8 @@ class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000
             if (b != 0x00) continue
             val body = readExact(len, deadline)
             val footer = readExact(4, deadline)
-            if (footer[2] != 0xDC.toByte() || footer[3] != 0xBA.toByte())
-                throw RadioException("Bad reply footer")
-            return xor(body)
+            if (footer[2] == 0xDC.toByte() && footer[3] == 0xBA.toByte()) return xor(body)
+            b = readByte(deadline)           // not a frame after all: look further
         }
     }
 
@@ -95,7 +116,7 @@ class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000
     private fun readByte(deadline: Long): Int {
         while (rxPos >= rxLen) {
             val left = (deadline - System.currentTimeMillis()).toInt()
-            if (left <= 0) throw RadioException("No answer from the radio (timeout)")
+            if (left <= 0) throw Timeout()
             rxLen = link.read(rx, left)
             rxPos = 0
         }
@@ -105,6 +126,7 @@ class K5Protocol(private val link: SerialLink, private val timeoutMs: Int = 6000
     private fun readExact(n: Int, deadline: Long) = ByteArray(n) { readByte(deadline).toByte() }
 
     companion object {
+        private const val TRIES = 3
         /** The driver's fixed session timestamp, 0x6457396A. */
         val TIMESTAMP = byteArrayOf(0x6a, 0x39, 0x57, 0x64)
         val HELLO = byteArrayOf(0x14, 0x05, 0x04, 0x00) + TIMESTAMP
