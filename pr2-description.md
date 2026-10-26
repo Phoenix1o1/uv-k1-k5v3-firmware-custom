@@ -64,16 +64,17 @@ Neither shows what the lists are called or how many channels they hold. The pick
 
 **Build flag: `ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER`, enabled in no preset**
 - Which editions get the picker is your call, so this PR doesn't touch `CMakePresets.json`. To build it, add `"ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER": true` to a preset, or pass `-DENABLE_FEAT_F4HWN_SCAN_LIST_PICKER=ON`.
-- `Fusion`, `Fusion_` and the editions built on them have room. `Max` doesn't: with the multiboot stub it would overflow by about 240 B.
+- `Custom`, `Fusion` and `Service` all have room with it on (91.0%, 59.0% and 93.9% of the 118 KB flash).
 
 ### Cost
 
 Nothing until the flag is enabled: every preset builds to exactly the size it has today. With the flag:
 
-| Edition | Flash before | With the picker | Δ |
-|---|---|---|---|
-| Fusion | 106,796 | 108,008 | +1,212 |
-| Labs | 116,940 | 118,148 | +1,208 |
+| Edition | Flash before | With the picker | Δ flash | Δ RAM |
+|---|---|---|---|---|
+| Custom | 69,924 | 71,152 | +1,228 | +96 |
+| Fusion | 108,728 | 109,940 | +1,212 | +96 |
+| Service | 112,276 | 113,480 | +1,204 | +96 |
 
 ### Files
 
@@ -83,9 +84,9 @@ Nothing until the flag is enabled: every preset builds to exactly the size it ha
 
 ### Testing
 
-- **Builds:** all presets build with no warnings, unchanged in size; Fusion and Labs also build with the flag on.
+- **Builds:** based on `feature_update_v7`. All presets (`Custom`, `Fusion`, `Service`) build with no warnings and unchanged in size; all three also build with the flag on.
 - **Host harness:** `scan_list_picker.c` was compiled against stubbed firmware state with the firmware fonts. It covered the counts (excluded, no-list, every-list and unnamed lists, memory 1024), opening on the current list, wrap-around, held repeat, MENU applying and resuming, EXIT/`*`/PTT, swallowed digits, auto-close when the scan stops and on the 10 s timeout, the MIX row hidden when the mix is empty, and falling back to `ALL` when the current list no longer exists.
-- **On the radio:** tested on a UV-K1(8).
+- **On the radio:** tested on a UV-K1(8) with the same change on the previous base (a 6.3 Labs build). The patch applied to `feature_update_v7` without conflicts.
 
 ### Possible follow-up
 
