@@ -180,6 +180,15 @@
                 "EDITION_STRING": "Service",
                 "TARGET": "f4hwn.service"
             }
+        },
+        {
+            "name": "Testlab",
+            "inherits": "Fusion",
+            "cacheVariables": {
+                "ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER": true,
+                "EDITION_STRING": "Testlab",
+                "TARGET": "f4hwn.testlab"
+            }
         }
     ],
     "buildPresets": [
@@ -194,6 +203,10 @@
         {
             "name": "Service",
             "configurePreset": "Service"
+        },
+        {
+            "name": "Testlab",
+            "configurePreset": "Testlab"
         }
     ]
 }

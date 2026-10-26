@@ -9,6 +9,7 @@ set -euo pipefail
 #   ./compile-firmware.sh Transfer
 #   ./compile-firmware.sh FieldOps
 #   ./compile-firmware.sh Labs
+#   ./compile-firmware.sh Testlab
 #   ./compile-firmware.sh Fusion -DDEV=ON
 #   ./compile-firmware.sh FieldOps -DENABLE_VOX=OFF
 #   ./compile-firmware.sh All
@@ -36,9 +37,9 @@ EXTRA_ARGS=("$@")
 # ---------------------------------------------
 # Validate preset name
 # ---------------------------------------------
-if [[ ! "$PRESET" =~ ^(Custom|Fusion|Service|All)$ ]]; then
+if [[ ! "$PRESET" =~ ^(Custom|Fusion|Service|Testlab|All)$ ]]; then
   echo "❌ Unknown preset: '$PRESET'"
-  echo "Valid presets are: Custom, Fusion, Service, All"
+  echo "Valid presets are: Custom, Fusion, Service, Testlab, All"
   exit 1
 fi
 
