@@ -50,7 +50,7 @@ Design notes:
 
 ### Cost
 
-- **Resident:** +444 B of flash and +0 B of RAM (the new field fits in existing padding), only in builds with `ENABLE_FEAT_F4HWN_OVERLAY_APPS`. Labs goes from 116,940 B to 117,384 B (97.2%). Editions without overlay apps are unchanged.
+- **Resident:** +444 B of flash and +0 B of RAM (the new field fits in existing padding), only in builds with `ENABLE_FEAT_F4HWN_OVERLAY_APPS`. Fusion goes from 108,728 B to 109,172 B (90.4% of 118 KB). Custom and Service, which have no overlay apps, are unchanged.
 
 ### Files
 
@@ -62,9 +62,9 @@ The README's app list isn't touched; that's yours to update if you take it.
 
 ### Testing
 
-- **Builds:** all presets build (`Fusion`, `Transfer`, `FieldOps`, `Labs`, `Max`, `Fusion_`, `Service_`, `Custom`) with no new warnings. All 44 apps build, including the existing ones against the extended header.
+- **Builds:** based on `feature_update_v7`. All presets build (`Custom`, `Fusion`, `Service`) with no warnings. All 48 apps build with no warnings, including the existing ones against the extended header.
 - **Host harness:** `chanlist_app.c` was run against a mock `app_api_t` with the firmware's own fonts. It covered group counts, held-key scrolling to memory 1024, long names, 6.25 kHz frequencies, repeater offset and tone, the empty-list, unnamed-list and every-list cases, and `mr_stage`.
-- **On the radio:** tested on a UV-K1(8) running a Labs-based build.
+- **On the radio:** tested on a UV-K1(8) with the same change on the previous base (a 6.3 Labs build). The patch applied to `feature_update_v7` without conflicts.
 
 ### Possible follow-ups
 
