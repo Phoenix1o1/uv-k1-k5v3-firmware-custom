@@ -99,6 +99,34 @@ object Ui {
         }
     }
 
+    /** One row of a pick list: a title, a line under it, and an optional tag on the right. */
+    class Row(val title: String, val subtitle: String, val tag: String? = null)
+
+    /** Rows for AlertDialog.setAdapter, all laid out alike whatever their length. */
+    fun rows(c: Context, rows: List<Row>) = object : android.widget.BaseAdapter() {
+        override fun getCount() = rows.size
+        override fun getItem(p: Int) = rows[p]
+        override fun getItemId(p: Int) = p.toLong()
+        override fun getView(p: Int, convert: View?, parent: ViewGroup?): View {
+            val r = rows[p]
+            val line = LinearLayout(c).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = dp(c, 64)
+                setPadding(dp(c, 24), dp(c, 10), dp(c, 24), dp(c, 10))
+            }
+            val texts = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
+            texts.addView(text(c, r.title, 16f))
+            texts.addView(text(c, r.subtitle, 13f, R.color.muted).apply { setPadding(0, dp(c, 2), 0, 0) })
+            line.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            if (r.tag != null) line.addView(text(c, r.tag, 12f, R.color.on_accent_soft, bold = true).apply {
+                background = rounded(color(c, R.color.accent_soft), dp(c, 12).toFloat())
+                setPadding(dp(c, 10), dp(c, 4), dp(c, 10), dp(c, 4))
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                .apply { marginStart = dp(c, 12) })
+            return line
+        }
+    }
+
     fun lp(top: Int = 0) = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         .apply { topMargin = top }
 }

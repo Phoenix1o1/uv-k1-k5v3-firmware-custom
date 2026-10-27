@@ -12,8 +12,7 @@ import java.net.URL
 /**
  * The CHIRP drivers and firmware asset packs the app keeps (in its own
  * storage, so it can read them back), and which one was used last.
- * Copies of downloaded files also go to Downloads, for CHIRP on a computer
- * and for UV Studio.
+ * Copies of downloaded drivers also go to Downloads, for CHIRP on a computer.
  */
 class Library(context: Context) {
 
@@ -112,15 +111,12 @@ class Library(context: Context) {
 /**
  * The firmware repository (armel/uv-k1-k5v3-firmware-custom), read as UV
  * Studio reads it: CHIRP drivers are release files named
- * f4hwn.chirp.v<version>.py; firmware packages are the .bin files of archive/ on main,
- * plus the development build on the v7 branch. Blocking calls: run them on
- * a worker thread.
+ * f4hwn.chirp.v<version>.py (f4hwn.fusion.chirp... before 6.0). Blocking
+ * calls: run them on a worker thread.
  */
 object Repo {
     const val REPO = "armel/uv-k1-k5v3-firmware-custom"
     private const val API = "https://api.github.com/repos/$REPO"
-    const val DEV_BRANCH = "feature_update_v7"
-    const val DEV_FILE = "f4hwn.fusion.development.bin"
 
     class RemoteFile(val name: String, val label: String, val url: String, val version: String)
 
@@ -139,23 +135,6 @@ object Repo {
                     ChirpDriver.VERSION.find(name)?.groupValues?.get(1) ?: "")
             }
         }
-        return out
-    }
-
-    /** F4HWN firmware packages: the archive on main, newest first, then the development build. */
-    fun firmwares(): List<RemoteFile> {
-        val files = JSONArray(String(get("$API/contents/archive?ref=main", json = true)))
-        val out = mutableListOf<RemoteFile>()
-        for (i in 0 until files.length()) {
-            val f = files.getJSONObject(i)
-            val name = f.getString("name")
-            if (!name.startsWith("f4hwn.") || !name.endsWith(".bin") || name.contains("sa818")) continue
-            val version = ChirpDriver.VERSION.find(name)?.groupValues?.get(1) ?: continue
-            out += RemoteFile(name, "v$version", f.getString("download_url"), version)
-        }
-        out.sortByDescending { Library.versionKey(it.version) }
-        out += RemoteFile(DEV_FILE, "development",
-            "https://raw.githubusercontent.com/$REPO/$DEV_BRANCH/archive/$DEV_FILE", "")
         return out
     }
 

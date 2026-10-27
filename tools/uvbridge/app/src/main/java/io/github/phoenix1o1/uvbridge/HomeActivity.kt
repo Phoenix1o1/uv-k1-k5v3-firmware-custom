@@ -23,7 +23,6 @@ import android.widget.TextView
 import android.widget.Toast
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialProber
-import io.github.phoenix1o1.uvbridge.chirp.AssetPack
 import io.github.phoenix1o1.uvbridge.chirp.AssetWriter
 import io.github.phoenix1o1.uvbridge.chirp.ChirpDriver
 import io.github.phoenix1o1.uvbridge.chirp.ChirpImage
@@ -47,8 +46,8 @@ import java.util.concurrent.Executors
  *
  * Drivers and asset packs are picked for the radio: the driver made for its
  * firmware version (else the last used, else the built-in layout), the
- * asset pack of the exact firmware build it runs (from the app's library,
- * else looked up in the firmware repository).
+ * asset pack of the exact firmware build it runs (loaded from the firmware
+ * file that was flashed, then kept).
  *
  * Radio and network work runs on a worker thread, which waits on the UI
  * for confirmations, choices and file saves, so each sequence reads top to
@@ -62,6 +61,8 @@ class HomeActivity : Activity() {
     private lateinit var library: Library
     private lateinit var scroll: ScrollView
     private lateinit var chirpCard: View
+    /** "Install again": shown once the app keeps an asset pack. */
+    private lateinit var againRow: View
     private lateinit var radioLine: TextView
     private lateinit var driverLine: TextView
     private lateinit var status: TextView
@@ -144,11 +145,13 @@ class HomeActivity : Activity() {
             action(R.string.chirp_edit) { pickFile(PICK_EDIT) })
         column.addView(chirpCard)
 
-        // firmware assets
-        column.addView(section(R.drawable.ic_assets, R.string.assets_title, R.string.assets_text,
-            action(R.string.assets_install, filled = true) { installAssets() },
-            action(R.string.from_repo) { firmwareFromRepo() },
-            action(R.string.from_file) { pickFile(PICK_FIRMWARE) }))
+        // firmware assets: for firmwares flashed from a file (UV Studio writes
+        // the assets itself when it flashes from the repository)
+        val assets = section(R.drawable.ic_assets, R.string.assets_title, R.string.assets_text,
+            action(R.string.assets_install, filled = true) { pickFile(PICK_FIRMWARE) }) as LinearLayout
+        againRow = Ui.buttonRow(this, action(R.string.assets_again) { installAssets(null) })
+        assets.addView(againRow)
+        column.addView(assets)
 
         // CHIRP drivers
         column.addView(section(R.drawable.ic_driver, R.string.drivers_title, R.string.drivers_text,
@@ -173,8 +176,9 @@ class HomeActivity : Activity() {
         return card.also { it.layoutParams = Ui.lp(dp(12)) }
     }
 
-    /** The driver the next radio or image session will use. */
+    /** The driver the next radio or image session will use, and whether a pack is kept. */
     private fun showPicks() {
+        againRow.visibility = if (library.packs().isEmpty()) View.GONE else View.VISIBLE
         val version = ChirpDriver.VERSION.find(lastFirmware)?.groupValues?.get(1) ?: ""
         val pick = library.pickDriver(version)
         driverLine.text = getString(R.string.home_driver, pick.item.name, pick.why)
@@ -216,55 +220,30 @@ class HomeActivity : Activity() {
     // ---- firmware assets ----
 
     /**
-     * Writes the asset pack of the firmware build the radio runs: from the
-     * library, else found in the repository (the firmware of the radio's
-     * version, then the development build).
+     * Writes an asset pack to the radio: [file]'s (the firmware .bin flashed
+     * by hand, or a .pack), else the kept pack of the build the radio runs.
+     * The radio only takes the pack of its own build.
      */
-    private fun installAssets() = withRadio { s ->
+    private fun installAssets(file: Library.StoredPack?) = withRadio { s ->
         val writer = AssetWriter(s.k5)
         val info = writer.info()
+        val stored = file ?: library.pickPack(info.runningBuildId)?.item
+            ?: return@withRadio "No kept asset pack for the firmware build of this radio (${info.runningBuildId.take(8)}…). " +
+                "Use \"${getString(R.string.assets_install)}\" with the .bin you flashed."
         if (info.loaded && info.status == 0 &&
             !ask(getString(R.string.assets_title), getString(R.string.assets_already), getString(R.string.assets_write_again)))
             return@withRadio "The radio's assets are installed and valid. Nothing written."
-
-        val stored = library.pickPack(info.runningBuildId)?.item ?: findPackInRepo(s.version, info.runningBuildId)
-            ?: return@withRadio "No asset pack for the firmware build of this radio (${info.runningBuildId.take(8)}…). " +
-                "Load the firmware .bin you flashed with \"${getString(R.string.from_file)}\"."
         writer.write(stored.pack, ::showProgress)
         library.usedPack(stored)
         "Firmware assets written and checked (${stored.name}). The radio redraws with them."
     }
 
-    /** Downloads candidate firmwares until one carries the pack of [buildId]. */
-    private fun findPackInRepo(version: String, buildId: String): Library.StoredPack? {
-        status("Looking for the assets of this build in the firmware repository…")
-        val all = try { Repo.firmwares() } catch (e: Exception) { return null }
-        val candidates = all.filter { version.isNotEmpty() && it.version == version } + all.filter { it.version.isEmpty() }
-        for (f in candidates.take(8)) {
-            status("Checking ${f.name}…")
-            val bytes = try { Repo.get(f.url) } catch (e: Exception) { continue }
-            val pack = try { AssetPack.from(bytes) } catch (e: Exception) { null } ?: continue
-            if (pack.buildId == buildId) return library.addPack(f.name, bytes)
-        }
-        return null
-    }
-
-    private fun firmwareFromRepo() = background {
-        val list = Repo.firmwares()
-        val i = choose(getString(R.string.assets_pick_firmware), list.map { "${it.name}  (${it.label})" })
-            ?: return@background "Nothing downloaded."
-        val f = list[i]
-        status("Downloading ${f.name}…")
-        val bytes = Repo.get(f.url)
-        save(f.name, bytes, FIRMWARE_FOLDER)
-        keepPack(f.name, bytes, "Saved to Downloads/$FIRMWARE_FOLDER: ${f.name}\n")
-    }
-
-    private fun keepPack(name: String, bytes: ByteArray, prefix: String = ""): String {
+    /** A firmware file was picked: keep its asset pack and write it. */
+    private fun firmwareFile(name: String, bytes: ByteArray) {
         val stored = library.addPack(name, bytes)
-            ?: return prefix + "This firmware has no asset pack (only v7 packages carry one); nothing to install."
-        return prefix + "Asset pack kept for build ${stored.pack.buildId.take(8)}… (${stored.pack.payloadSize} bytes). " +
-            "\"${getString(R.string.assets_install)}\" writes it to a radio running that build."
+            ?: return run { status.text = "$name has no asset pack (only v7 firmware packages carry one); nothing to install." }
+        showPicks()
+        installAssets(stored)
     }
 
     // ---- CHIRP drivers ----
@@ -272,8 +251,10 @@ class HomeActivity : Activity() {
     private fun driverFromRepo() = background {
         val list = Repo.drivers()
         if (list.isEmpty()) return@background "No CHIRP driver found in the releases."
-        val i = choose(getString(R.string.drivers_pick), list.map { "${it.name}  (${it.label})" })
-            ?: return@background "Nothing downloaded."
+        val kept = library.drivers().map { it.name }.toSet()
+        val i = choose(getString(R.string.drivers_pick), list.map { f ->
+            Ui.Row("F4HWN ${f.version.ifEmpty { f.label }}", f.name, if (f.name in kept) "Kept" else null)
+        }) ?: return@background "Nothing downloaded."
         val f = list[i]
         status("Downloading ${f.name}…")
         val bytes = Repo.get(f.url)
@@ -286,11 +267,13 @@ class HomeActivity : Activity() {
     private fun manageDrivers() {
         val all = library.drivers()
         val current = library.pickDriver(ChirpDriver.VERSION.find(lastFirmware)?.groupValues?.get(1) ?: "").item
-        val labels = all.map { d ->
-            (if (d.name == current.name) "● " else "") + d.name + if (d.version.isNotEmpty()) "\n" + d.version else ""
+        val rows = all.map { d ->
+            val tag = if (d.name == current.name) "In use" else null
+            if (d.isBuiltin) Ui.Row(getString(R.string.drivers_builtin), getString(R.string.drivers_builtin_text), tag)
+            else Ui.Row("F4HWN ${d.firmwareVersion.ifEmpty { "?" }}", d.name, tag)
         }
         AlertDialog.Builder(this).setTitle(R.string.drivers_title)
-            .setItems(labels.toTypedArray()) { _, i -> driverOptions(all[i]) }
+            .setAdapter(Ui.rows(this, rows)) { _, i -> driverOptions(all[i]) }
             .setNegativeButton(android.R.string.cancel, null).show()
     }
 
@@ -336,7 +319,7 @@ class HomeActivity : Activity() {
                     showPicks()
                     status.text = "Driver kept: ${d.name}\n${d.version}"
                 }
-                PICK_FIRMWARE -> status.text = keepPack(name, bytes)
+                PICK_FIRMWARE -> firmwareFile(name, bytes)
             }
         } catch (e: Exception) {
             status.text = e.message ?: e.toString()
@@ -447,12 +430,12 @@ class HomeActivity : Activity() {
         return answer.get()
     }
 
-    /** Lets the user pick one of [items] on the UI thread; null when cancelled. */
-    private fun choose(title: String, items: List<String>): Int? {
+    /** Lets the user pick one of [rows] on the UI thread; null when cancelled. */
+    private fun choose(title: String, rows: List<Ui.Row>): Int? {
         val answer = CompletableFuture<Int?>()
         runOnUiThread {
             AlertDialog.Builder(this).setTitle(title)
-                .setItems(items.toTypedArray()) { _, i -> answer.complete(i) }
+                .setAdapter(Ui.rows(this, rows)) { _, i -> answer.complete(i) }
                 .setNegativeButton(android.R.string.cancel) { _, _ -> answer.complete(null) }
                 .setOnDismissListener { answer.complete(null) }
                 .show()
@@ -501,9 +484,8 @@ class HomeActivity : Activity() {
         private const val EDITED = 3
         private const val PICK_DRIVER = 4
         private const val PICK_FIRMWARE = 5
-        /** Images and backups go to Downloads/CHIRP, drivers to its drivers folder, firmwares to Downloads/F4HWN. */
+        /** Images and backups go to Downloads/CHIRP, drivers to its drivers folder. */
         const val CHIRP_FOLDER = "CHIRP"
         const val DRIVER_FOLDER = "CHIRP/drivers"
-        const val FIRMWARE_FOLDER = "F4HWN"
     }
 }

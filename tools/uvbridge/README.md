@@ -7,9 +7,12 @@ The app opens on its home screen, light or dark with the system:
 
 - **UV Studio**: the live UV Studio site, with the cable (below).
 - **CHIRP image**: download, upload, view and edit CHIRP `.img` files.
-- **Firmware assets**: install the fonts and menu texts of a v7 firmware.
+- **Firmware assets**: install the fonts and menu texts of a v7 firmware
+  flashed from a file.
 - **CHIRP drivers**: the driver files whose memory layout the image code follows.
 
+Long press on the app icon for shortcuts to UV Studio and CHIRP image; in
+UV Studio, the round button at the bottom left (or Back) returns home.
 A card at the top shows the radio last connected and the driver picked
 for it, and the progress of what is running.
 
@@ -90,20 +93,19 @@ differently from the 6.3 layout, is refused.
 
 F4HWN v7 firmwares keep their fonts and menu texts in an asset zone of the
 external flash. The release `.bin` carries them as an asset pack after the
-firmware image; UV Studio writes it after flashing. **Install on radio**
-does the same on a radio that already runs the firmware (for instance when
-the pack was not written after a flash):
+firmware image. UV Studio writes it when it flashes a firmware from its
+list, so the app is only needed for a firmware flashed from a file (a custom
+build, for instance):
 
-1. it asks the radio which firmware build it runs,
-2. picks the asset pack of that exact build: one the app keeps, else it
-   looks in the firmware repository (the firmware of the radio's version,
-   then the development build),
-3. writes it (payload first, header last, so an interrupted write never
-   counts as valid), and the radio checks it and redraws.
+- **Install from firmware file**: pick the same `.bin` you flashed. The app
+  keeps its asset pack, asks the radio which firmware build it runs, and
+  writes the pack (payload first, header last, so an interrupted write never
+  counts as valid); the radio checks it and redraws. The radio only takes
+  the pack of its own build.
+- **Install again** (once a pack is kept): writes the kept pack that matches
+  the build the radio runs.
 
-**From repository** downloads a firmware `.bin` to Downloads/F4HWN and keeps
-its asset pack; **From file** keeps the pack of a `.bin` (or `.pack`) on the
-phone. Firmwares before v7 have no asset zone; the app says so.
+Firmwares before v7 have no asset zone; the app says so.
 
 ## Tests
 
