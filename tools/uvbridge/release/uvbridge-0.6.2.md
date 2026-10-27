@@ -1,0 +1,2 @@
+- Driver lists: each driver shows its firmware version, file name and a tag (kept / in use), laid out alike.
+- Firmware assets: only for firmwares flashed from a file. "Install from firmware file" takes the same .bin and writes its fonts and menus to the radio; "Install again" appears once a pack is kept. The repository download is gone (UV Studio installs the assets of what it flashes).
