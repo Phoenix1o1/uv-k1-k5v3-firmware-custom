@@ -1,0 +1,26 @@
+# UV Bridge releases: pushing a tag uvbridge-v<version> publishes the APK
+# committed as tools/uvbridge/release/uvbridge-<version>.apk, with the notes
+# in tools/uvbridge/release/uvbridge-<version>.md.
+name: UV Bridge release
+
+on:
+  push:
+    tags: ['uvbridge-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG#uvbridge-v}"
+          DIR=tools/uvbridge/release
+          gh release create "$TAG" "$DIR/uvbridge-$VERSION.apk" \
+            --title "UV Bridge $VERSION" --notes-file "$DIR/uvbridge-$VERSION.md" --verify-tag

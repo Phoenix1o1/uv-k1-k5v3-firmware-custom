@@ -1,0 +1,4 @@
+- One app and one icon: home screen with UV Studio, CHIRP image, firmware assets and CHIRP drivers; new light/dark look.
+- CHIRP drivers: download from the firmware releases or load a .py file; the image editor follows the driver's memory layout and shows new settings it adds. Picked automatically by firmware version, else the last used.
+- Firmware assets: install the fonts/menus pack of the firmware build the radio runs (v7), from the app or found in the firmware repository.
+- Firmware downloads go to Downloads/F4HWN, drivers to Downloads/CHIRP/drivers.
