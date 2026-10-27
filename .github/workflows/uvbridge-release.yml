@@ -1,11 +1,15 @@
-# UV Bridge releases: pushing a tag uvbridge-v<version> publishes the APK
-# committed as tools/uvbridge/release/uvbridge-<version>.apk, with the notes
-# in tools/uvbridge/release/uvbridge-<version>.md.
+# UV Bridge releases: when a commit on uvbridge adds an APK as
+# tools/uvbridge/release/uvbridge-<version>.apk, publish it as the release
+# uvbridge-v<version> (tag created here, on that commit) with the notes in
+# tools/uvbridge/release/uvbridge-<version>.md. Versions already released
+# are left alone.
 name: UV Bridge release
 
 on:
   push:
-    tags: ['uvbridge-v*']
+    branches: [uvbridge]
+    paths: ['tools/uvbridge/release/*.apk']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,12 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Publish the release
+      - name: Publish new versions
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${TAG#uvbridge-v}"
-          DIR=tools/uvbridge/release
-          gh release create "$TAG" "$DIR/uvbridge-$VERSION.apk" \
-            --title "UV Bridge $VERSION" --notes-file "$DIR/uvbridge-$VERSION.md" --verify-tag
+          cd tools/uvbridge/release
+          for apk in uvbridge-*.apk; do
+            VERSION="${apk#uvbridge-}"; VERSION="${VERSION%.apk}"
+            TAG="uvbridge-v$VERSION"
+            if gh release view "$TAG" >/dev/null 2>&1; then continue; fi
+            gh release create "$TAG" "$apk" --target "$GITHUB_SHA" \
+              --title "UV Bridge $VERSION" --notes-file "uvbridge-$VERSION.md"
+          done
