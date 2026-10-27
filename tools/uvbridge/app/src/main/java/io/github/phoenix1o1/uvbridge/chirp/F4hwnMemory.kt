@@ -172,139 +172,211 @@ class Setting(
 
 object Settings {
 
-    /** A bit field of [width] bits, [shift] bits above the least significant one. */
-    private fun field(group: String, label: String, addr: Int, shift: Int, width: Int, options: List<String>) =
-        Setting(group, label, options,
-            get = { m -> ((m[addr].toInt() and 0xff) shr shift and ((1 shl width) - 1)).takeIf { it < options.size } },
-            set = { m, v ->
-                val mask = ((1 shl width) - 1) shl shift
-                m[addr] = ((m[addr].toInt() and mask.inv()) or ((v shl shift) and mask)).toByte()
-            })
+    /** The group of the settings that only the loaded driver knows. */
+    const val EXTRA = "From the driver"
 
-    private fun byte(group: String, label: String, addr: Int, options: List<String>) =
-        field(group, label, addr, 0, 8, options)
+    /** The settings of the built-in layout (f4hwn.chirp.v6.3.0.py). */
+    val ALL: List<Setting> by lazy { forDriver(ChirpDriver.BUILTIN) }
 
-    private fun u16(group: String, label: String, addr: Int, options: List<String>) =
-        Setting(group, label, options,
-            get = { m -> ((m[addr].toInt() and 0xff) or ((m[addr + 1].toInt() and 0xff) shl 8)).takeIf { it < options.size } },
-            set = { m, v -> m[addr] = v.toByte(); m[addr + 1] = (v shr 8).toByte() })
+    /**
+     * The settings, at the addresses [d] gives. A setting whose fields the
+     * driver no longer has is left out; fields of the driver this app has
+     * no setting for are added at the end, in [EXTRA], with the driver's
+     * label and list.
+     */
+    fun forDriver(d: ChirpDriver): List<Setting> = Builder(d).run {
+        listOfNotNull(
+            byte("Basic", "Squelch (Sql)", "squelch", range(0, 9)),
+            rxMode(),
+            byte("Basic", "Main VFO", "TX_VFO", listOf("A", "B")),
+            byte("Basic", "Max TX time (TxTOut)", "max_talk_time", TALK_TIME),
+            vox(),
+            byte("Basic", "Mic gain (Mic)", "mic_gain", MIC_GAIN),
+            byte("Basic", "Battery saver (BatSav)", "battery_save", listOf("OFF", "1:1", "1:2", "1:3", "1:4", "1:5")),
+            byte("Basic", "Channel display (ChDisp)", "channel_display_mode", listOf("FREQ", "CHANNEL NUMBER", "NAME", "NAME + FREQ")),
+            byte("Basic", "Scan resume (ScnRev)", "scan_resume_mode", SCAN_RESUME),
+            byte("Basic", "Auto keypad lock (KeyLck)", "auto_keypad_lock", listOf("OFF") + (1..40).map { "%02dm:%02ds".format(it * 15 / 60, it * 15 % 60) }),
+            byte("Basic", "Keypad locked", "key_lock", OFF_ON),
+            byte("Basic", "Key beep (Beep)", "button_beep", OFF_ON),
+            byte("Basic", "Roger beep (Roger)", "roger_beep", listOf("OFF", "ROGER", "MDC")),
+            byte("Basic", "Squelch tail elimination (STE)", "ste", OFF_ON),
+            byte("Basic", "Repeater tail elimination (RP STE)", "rp_ste", listOf("OFF") + (1..10).map { "${it * 100}ms" }),
+            byte("Basic", "Power-on message (POnMsg)", "power_on_dispmode", listOf("ALL", "SOUND", "MESSAGE", "VOLTAGE", "LOGO", "NONE")),
+            logo("Welcome line 1", "logo_line1"),
+            logo("Welcome line 2", "logo_line2"),
+            u16("Basic", "One-key call channel (1 Call)", "sl.call_channel", channels),
 
-    /** The F4HWN byte at 0xA15F (set_pwr:4 set_sav:2 set_scn:1 set_ptt:1);
-     *  while still erased the driver shows its defaults. */
-    private const val STATE7 = 0xA15F
-    private fun state7(label: String, shift: Int, width: Int, options: List<String>, inverted: Boolean = false): Setting {
-        val f = field("F4HWN", label, STATE7, shift, width, if (inverted) listOf("1", "0") else options)
-        val erased = { m: ByteArray -> (m[STATE7].toInt() and 0xff) == 0xff }
-        return Setting("F4HWN", label, options,
-            get = { m -> if (erased(m)) 0 else f.get(m)?.let { if (inverted) 1 - it else it } },
-            set = { m, v ->
-                // the driver writes every field of this byte: start from its defaults
-                if (erased(m)) m[STATE7] = 0x02       // pwr 0, sav 0, scn stored 1 (NORMAL), ptt 0
-                f.set(m, if (inverted) 1 - v else v)
-            })
+            byte("Display", "Backlight time (BLTime)", "backlight_time", BACKLIGHT),
+            byte("Display", "Backlight min (BLMin)", "backlight_min", range(0, 10)),
+            byte("Display", "Backlight max (BLMax)", "backlight_max", range(0, 10)),
+            byte("Display", "Backlight on TX/RX (BLTxRx)", "backlight_on_TX_RX", listOf("OFF", "TX", "RX", "TX/RX")),
+            byte("Display", "Battery display (BatTXT)", "battery_text", listOf("NONE", "VOLTAGE", "PERCENT")),
+            byte("Display", "Mic level bar (MicBar)", "mic_bar", OFF_ON),
+            byte("Display", "Contrast (SetCtr)", "set_contrast", range(0, 15)),
+            byte("Display", "Invert display (SetInv)", "set_inv", OFF_ON),
+            byte("Display", "S-meter style (SetMet)", "set_met", listOf("TINY", "CLASSIC")),
+            byte("Display", "Text style (SetGui)", "set_gui", listOf("TINY", "CLASSIC")),
+
+            state7("USER power level (SetPwr)", "set_pwr", listOf("< 20mW", "125mW", "250mW", "500mW", "1W", "2W", "5W")),
+            state7("PTT mode (SetPtt)", "set_ptt", listOf("CLASSIC", "ONEPUSH")),
+            state7("Scan speed (SetScn)", "set_scn", listOf("NORMAL", "FAST"), inverted = true),
+            state7("Screen saver (SetSav)", "set_sav", listOf("OFF", "LOGO", "LOGO+", "MATRIX")),
+            byte("F4HWN", "TX timeout alert (SetTot)", "set_tot", ALERT),
+            byte("F4HWN", "End of TX alert (SetEot)", "set_eot", ALERT),
+            byte("F4HWN", "Keypad lock scope (SetLck)", "set_lck", listOf("KEYS", "KEYS + ACTIONS", "KEYS + PTT", "KEYS + ACTIONS + PTT")),
+            byte("F4HWN", "Timer (SetTmr)", "set_tmr", OFF_ON),
+            byte("F4HWN", "Off timer (SetOff)", "set_off_tmr", listOf("OFF") + (1..120).map { "%dh:%02dm".format(it / 60, it % 60) }),
+            byte("F4HWN", "Narrow FM (SetNFM)", "set_nfm", listOf("NARROW", "NARROWER")),
+            byte("F4HWN", "RX audio FM (SetRxA)", "set_rxa_fm", listOf("FLAT", "CLEAN", "MID", "BOOST", "MAX")),
+            byte("F4HWN", "RX audio AM (SetRxA)", "set_rxa_am", listOf("SHARP", "STOCK", "OPEN")),
+            byte("F4HWN", "Menu key (SetKEY)", "set_key", listOf("MENU", "KEY_UP", "KEY_DOWN", "KEY_EXIT", "KEY_STAR")),
+            byte("F4HWN", "RescueOps (menu lock)", "set_menu_lock", OFF_ON),
+
+            byte("Keys", "Side key 1 short", "key1_shortpress_action", KEY_ACTIONS),
+            byte("Keys", "Side key 1 long", "key1_longpress_action", KEY_ACTIONS),
+            byte("Keys", "Side key 2 short", "key2_shortpress_action", KEY_ACTIONS),
+            byte("Keys", "Side key 2 long", "key2_longpress_action", KEY_ACTIONS),
+            byte("Keys", "M key long", "keyM_longpress_action", KEY_ACTIONS),
+
+            defaultList(),
+            byte("Scan lists", "Priority scan", "sl.slPriorEnab", OFF_ON),
+            u16("Scan lists", "Priority channel 1", "sl.slPriorCh1", channels + "None"),
+            u16("Scan lists", "Priority channel 2", "sl.slPriorCh2", channels + "None"),
+        ) + listNames() + extras()
     }
 
-    private fun logo(label: String, addr: Int) = Setting("Basic", label, maxLength = 12,
-        text = { m -> ascii(m, addr, 16).takeWhile { it != '\u0000' && it != '\u00ff' }.trim() },
-        setText = { m, s ->
-            val b = (s.trimEnd(' ') + "\u0000".repeat(12)).take(12) + "\u0000\u00ff\u00ff\u00ff"
-            for (i in 0 until 16) m[addr + i] = b[i].code.toByte()
-        })
-
-    private fun listName(i: Int) = Setting("Scan lists", "List ${i + 1} name", maxLength = 3,
-        text = { m -> ascii(m, 0x880E + i * 4, 4).filter { it.code in 32..126 }.trim() },
-        setText = { m, s ->
-            val b = if (s.isEmpty()) ByteArray(4) { 0xff.toByte() }
-                    else s.take(3).padEnd(4, ' ').map { it.code.toByte() }.toByteArray()
-            b.copyInto(m, 0x880E + i * 4)
-        })
-
-    /** RX mode: dual_watch (0xA00C) and crossband (0xA00A), set to the main VFO + 1 (0xA0C3). */
-    private val rxMode = Setting("Basic", "RX mode (RxMode)", RX_MODES,
-        get = { m ->
-            val dw = m[0xA00C].toInt() and 0xff
-            val cb = m[0xA00A].toInt() and 0xff
-            if (dw == 3) (if (cb != 0) 5 else 4) else (if (cb != 0) 2 else 0) + (if (dw != 0) 1 else 0)
-        },
-        set = { m, v ->
-            val main = (m[0xA0C3].toInt() and 0xff) + 1
-            if (v >= 4) {
-                m[0xA00C] = 3; m[0xA00A] = (if (v == 5) main else 0).toByte()
-            } else {
-                m[0xA00A] = (main * (v shr 1 and 1)).toByte(); m[0xA00C] = (main * (v and 1)).toByte()
-            }
-        })
-
-    /** VOX: vox_switch (0xA005) and vox_level (0xA006). */
-    private val vox = Setting("Basic", "VOX", listOf("OFF") + range(1, 10),
-        get = { m -> (((m[0xA006].toInt() and 0xff) + 1) * (if (m[0xA005].toInt() != 0) 1 else 0)).takeIf { it <= 10 } },
-        set = { m, v -> m[0xA005] = (if (v > 0) 1 else 0).toByte(); m[0xA006] = (if (v > 0) v - 1 else 0).toByte() })
-
-    /** Default scan list (slDef, 7 bits at 0xA130): stored 1..24, 26 for MIX, 25 for ALL. */
-    private val defaultList = Setting("Scan lists", "Default scan list", (1..24).map { "LIST $it" } + listOf("MIX", "ALL"),
-        get = { m -> SL_VALUES.indexOf(m[0xA130].toInt() and 0x7f).takeIf { it >= 0 } },
-        set = { m, v -> m[0xA130] = ((m[0xA130].toInt() and 0x80) or SL_VALUES[v]).toByte() })
+    /** Fields the settings above use: the extras skip them. */
+    private val KNOWN = setOf("squelch", "dual_watch", "crossband", "TX_VFO", "max_talk_time", "vox_switch",
+        "vox_level", "mic_gain", "battery_save", "channel_display_mode", "scan_resume_mode", "auto_keypad_lock",
+        "key_lock", "button_beep", "roger_beep", "ste", "rp_ste", "power_on_dispmode", "logo_line1", "logo_line2",
+        "backlight_time", "backlight_min", "backlight_max", "backlight_on_TX_RX", "battery_text", "mic_bar",
+        "set_contrast", "set_inv", "set_met", "set_gui", "set_pwr", "set_ptt", "set_scn", "set_sav", "set_tot",
+        "set_eot", "set_lck", "set_tmr", "set_off_tmr", "set_nfm", "set_rxa_fm", "set_rxa_am", "set_key",
+        "set_menu_lock", "key1_shortpress_action", "key1_longpress_action", "key2_shortpress_action",
+        "key2_longpress_action", "keyM_longpress_action")
 
     private val channels = (1..Channels.COUNT).map { "M$it" }
 
-    val ALL: List<Setting> = listOf(
-        byte("Basic", "Squelch (Sql)", 0xA001, range(0, 9)),
-        rxMode,
-        byte("Basic", "Main VFO", 0xA0C3, listOf("A", "B")),
-        byte("Basic", "Max TX time (TxTOut)", 0xA002, TALK_TIME),
-        vox,
-        byte("Basic", "Mic gain (Mic)", 0xA007, MIC_GAIN),
-        byte("Basic", "Battery saver (BatSav)", 0xA00B, listOf("OFF", "1:1", "1:2", "1:3", "1:4", "1:5")),
-        byte("Basic", "Channel display (ChDisp)", 0xA009, listOf("FREQ", "CHANNEL NUMBER", "NAME", "NAME + FREQ")),
-        byte("Basic", "Scan resume (ScnRev)", 0xA0AD, SCAN_RESUME),
-        byte("Basic", "Auto keypad lock (KeyLck)", 0xA0AE, listOf("OFF") + (1..40).map { "%02dm:%02ds".format(it * 15 / 60, it * 15 % 60) }),
-        field("Basic", "Keypad locked", 0xA004, 0, 1, OFF_ON),
-        field("Basic", "Key beep (Beep)", 0xA0A8, 0, 1, OFF_ON),
-        byte("Basic", "Roger beep (Roger)", 0xA0C1, listOf("OFF", "ROGER", "MDC")),
-        field("Basic", "Squelch tail elimination (STE)", 0xA00E, 0, 1, OFF_ON),
-        byte("Basic", "Repeater tail elimination (RP STE)", 0xA0C2, listOf("OFF") + (1..10).map { "${it * 100}ms" }),
-        byte("Basic", "Power-on message (POnMsg)", 0xA0AF, listOf("ALL", "SOUND", "MESSAGE", "VOLTAGE", "LOGO", "NONE")),
-        logo("Welcome line 1", 0xA0C8),
-        logo("Welcome line 2", 0xA0D8),
-        u16("Basic", "One-key call channel (1 Call)", 0xA135, channels),
+    private class Builder(val d: ChirpDriver) {
 
-        byte("Display", "Backlight time (BLTime)", 0xA00D, BACKLIGHT),
-        field("Display", "Backlight min (BLMin)", 0xA008, 4, 4, range(0, 10)),
-        field("Display", "Backlight max (BLMax)", 0xA008, 0, 4, range(0, 10)),
-        field("Display", "Backlight on TX/RX (BLTxRx)", 0xA157, 6, 2, listOf("OFF", "TX", "RX", "TX/RX")),
-        field("Display", "Battery display (BatTXT)", 0xA157, 2, 2, listOf("NONE", "VOLTAGE", "PERCENT")),
-        field("Display", "Mic level bar (MicBar)", 0xA157, 4, 1, OFF_ON),
-        field("Display", "Contrast (SetCtr)", 0xA15D, 0, 4, range(0, 15)),
-        field("Display", "Invert display (SetInv)", 0xA15D, 4, 1, OFF_ON),
-        field("Display", "S-meter style (SetMet)", 0xA15D, 6, 1, listOf("TINY", "CLASSIC")),
-        field("Display", "Text style (SetGui)", 0xA15D, 7, 1, listOf("TINY", "CLASSIC")),
+        /** A bit field or a whole byte, as the driver places it; null when it has no such field. */
+        fun byte(group: String, label: String, name: String, options: List<String>): Setting? {
+            val f = d.fields[name]?.takeIf { it.size == 1 && it.count == 1 } ?: return null
+            val shift = f.shift
+            val width = if (f.bits > 0) f.bits else 8
+            val addr = f.offset
+            return Setting(group, label, options,
+                get = { m -> ((m[addr].toInt() and 0xff) shr shift and ((1 shl width) - 1)).takeIf { it < options.size } },
+                set = { m, v ->
+                    val mask = ((1 shl width) - 1) shl shift
+                    m[addr] = ((m[addr].toInt() and mask.inv()) or ((v shl shift) and mask)).toByte()
+                })
+        }
 
-        state7("USER power level (SetPwr)", 4, 4, listOf("< 20mW", "125mW", "250mW", "500mW", "1W", "2W", "5W")),
-        state7("PTT mode (SetPtt)", 0, 1, listOf("CLASSIC", "ONEPUSH")),
-        state7("Scan speed (SetScn)", 1, 1, listOf("NORMAL", "FAST"), inverted = true),
-        state7("Screen saver (SetSav)", 2, 2, listOf("OFF", "LOGO", "LOGO+", "MATRIX")),
-        field("F4HWN", "TX timeout alert (SetTot)", 0xA15E, 4, 4, ALERT),
-        field("F4HWN", "End of TX alert (SetEot)", 0xA15E, 0, 4, ALERT),
-        field("F4HWN", "Keypad lock scope (SetLck)", 0xA15A, 0, 2, listOf("KEYS", "KEYS + ACTIONS", "KEYS + PTT", "KEYS + ACTIONS + PTT")),
-        field("F4HWN", "Timer (SetTmr)", 0xA15C, 0, 1, OFF_ON),
-        field("F4HWN", "Off timer (SetOff)", 0xA15C, 1, 7, listOf("OFF") + (1..120).map { "%dh:%02dm".format(it / 60, it % 60) }),
-        field("F4HWN", "Narrow FM (SetNFM)", 0xA00E, 1, 2, listOf("NARROW", "NARROWER")),
-        field("F4HWN", "RX audio FM (SetRxA)", 0xA000, 0, 4, listOf("FLAT", "CLEAN", "MID", "BOOST", "MAX")),
-        field("F4HWN", "RX audio AM (SetRxA)", 0xA000, 4, 4, listOf("SHARP", "STOCK", "OPEN")),
-        field("F4HWN", "Menu key (SetKEY)", 0xA004, 2, 4, listOf("MENU", "KEY_UP", "KEY_DOWN", "KEY_EXIT", "KEY_STAR")),
-        field("F4HWN", "RescueOps (menu lock)", 0xA004, 1, 1, OFF_ON),
+        fun u16(group: String, label: String, name: String, options: List<String>): Setting? {
+            val addr = d.fields[name]?.takeIf { it.size == 2 }?.offset ?: return null
+            return Setting(group, label, options,
+                get = { m -> ((m[addr].toInt() and 0xff) or ((m[addr + 1].toInt() and 0xff) shl 8)).takeIf { it < options.size } },
+                set = { m, v -> m[addr] = v.toByte(); m[addr + 1] = (v shr 8).toByte() })
+        }
 
-        byte("Keys", "Side key 1 short", 0xA0A9, KEY_ACTIONS),
-        byte("Keys", "Side key 1 long", 0xA0AA, KEY_ACTIONS),
-        byte("Keys", "Side key 2 short", 0xA0AB, KEY_ACTIONS),
-        byte("Keys", "Side key 2 long", 0xA0AC, KEY_ACTIONS),
-        field("Keys", "M key long", 0xA0A8, 1, 7, KEY_ACTIONS),
+        /**
+         * The F4HWN byte of set_pwr / set_sav / set_scn / set_ptt (0xA15F);
+         * while still erased the driver shows its defaults, and writing one
+         * field writes them all: SetScn stored 1 (NORMAL), the others 0.
+         */
+        fun state7(label: String, name: String, options: List<String>, inverted: Boolean = false): Setting? {
+            val f = byte("F4HWN", label, name, if (inverted) listOf("1", "0") else options) ?: return null
+            val addr = d.addr(name)
+            val defaults = d.fields["set_scn"]?.let { 1 shl it.shift } ?: 0
+            val erased = { m: ByteArray -> (m[addr].toInt() and 0xff) == 0xff }
+            return Setting("F4HWN", label, options,
+                get = { m -> if (erased(m)) 0 else f.get(m)?.let { if (inverted) 1 - it else it } },
+                set = { m, v ->
+                    if (erased(m)) m[addr] = defaults.toByte()
+                    f.set(m, if (inverted) 1 - v else v)
+                })
+        }
 
-        defaultList,
-        field("Scan lists", "Priority scan", 0xA130, 7, 1, OFF_ON),
-        u16("Scan lists", "Priority channel 1", 0xA131, channels + "None"),
-        u16("Scan lists", "Priority channel 2", 0xA133, channels + "None"),
-    ) + (0 until 24).map { listName(it) }
+        fun logo(label: String, name: String): Setting? {
+            val addr = d.fields[name]?.takeIf { it.type == "char" && it.size == 16 }?.offset ?: return null
+            return Setting("Basic", label, maxLength = 12,
+                text = { m -> ascii(m, addr, 16).takeWhile { it != '\u0000' && it != '\u00ff' }.trim() },
+                setText = { m, s ->
+                    val b = (s.trimEnd(' ') + "\u0000".repeat(12)).take(12) + "\u0000\u00ff\u00ff\u00ff"
+                    for (i in 0 until 16) m[addr + i] = b[i].code.toByte()
+                })
+        }
+
+        fun listNames(): List<Setting> {
+            val base = d.addr("listname")
+            return (0 until ChirpImage.LISTS).map { i ->
+                Setting("Scan lists", "List ${i + 1} name", maxLength = 3,
+                    text = { m -> ascii(m, base + i * 4, 4).filter { it.code in 32..126 }.trim() },
+                    setText = { m, s ->
+                        val b = if (s.isEmpty()) ByteArray(4) { 0xff.toByte() }
+                                else s.take(3).padEnd(4, ' ').map { it.code.toByte() }.toByteArray()
+                        b.copyInto(m, base + i * 4)
+                    })
+            }
+        }
+
+        /** RX mode: dual_watch and crossband, set to the main VFO + 1. */
+        fun rxMode(): Setting? {
+            if (!d.has("dual_watch") || !d.has("crossband") || !d.has("TX_VFO")) return null
+            val dwA = d.addr("dual_watch"); val cbA = d.addr("crossband"); val vfoA = d.addr("TX_VFO")
+            return Setting("Basic", "RX mode (RxMode)", RX_MODES,
+                get = { m ->
+                    val dw = m[dwA].toInt() and 0xff
+                    val cb = m[cbA].toInt() and 0xff
+                    if (dw == 3) (if (cb != 0) 5 else 4) else (if (cb != 0) 2 else 0) + (if (dw != 0) 1 else 0)
+                },
+                set = { m, v ->
+                    val main = (m[vfoA].toInt() and 0xff) + 1
+                    if (v >= 4) {
+                        m[dwA] = 3; m[cbA] = (if (v == 5) main else 0).toByte()
+                    } else {
+                        m[cbA] = (main * (v shr 1 and 1)).toByte(); m[dwA] = (main * (v and 1)).toByte()
+                    }
+                })
+        }
+
+        /** VOX: vox_switch and vox_level. */
+        fun vox(): Setting? {
+            if (!d.has("vox_switch") || !d.has("vox_level")) return null
+            val sw = d.addr("vox_switch"); val lvl = d.addr("vox_level")
+            return Setting("Basic", "VOX", listOf("OFF") + range(1, 10),
+                get = { m -> (((m[lvl].toInt() and 0xff) + 1) * (if (m[sw].toInt() != 0) 1 else 0)).takeIf { it <= 10 } },
+                set = { m, v -> m[sw] = (if (v > 0) 1 else 0).toByte(); m[lvl] = (if (v > 0) v - 1 else 0).toByte() })
+        }
+
+        /** Default scan list (slDef, 7 bits): stored 1..24, 26 for MIX, 25 for ALL. */
+        fun defaultList(): Setting? {
+            val f = d.fields["sl.slDef"]?.takeIf { it.size == 1 && it.bits == 7 } ?: return null
+            val addr = f.offset; val shift = f.shift
+            val mask = 0x7f shl shift
+            return Setting("Scan lists", "Default scan list", (1..24).map { "LIST $it" } + listOf("MIX", "ALL"),
+                get = { m -> SL_VALUES.indexOf((m[addr].toInt() and mask) shr shift).takeIf { it >= 0 } },
+                set = { m, v -> m[addr] = ((m[addr].toInt() and mask.inv()) or (SL_VALUES[v] shl shift)).toByte() })
+        }
+
+        /**
+         * Settings of the driver the app does not know: single-byte fields in
+         * the settings area that the driver shows as a list (the stored value
+         * is the index in it). Left out: fields the driver only writes in its
+         * advanced mode, and its int_* unlock settings (TX band plan...).
+         */
+        fun extras(): List<Setting> = d.fields.mapNotNull { (name, f) ->
+            if ('.' in name || name.startsWith("__") || name.startsWith("int_") || name in KNOWN || name in d.advanced)
+                return@mapNotNull null
+            if (f.size != 1 || f.count != 1 || f.type == "char" || f.offset !in 0xA000 until d.progSize) return@mapNotNull null
+            val width = if (f.bits > 0) f.bits else 8
+            val options = (d.settingLists[name] ?: (name.uppercase() + "_LIST")).let { d.lists[it] }
+                ?.takeIf { it.size in 2..(1 shl width) } ?: return@mapNotNull null
+            val label = d.labels[name]?.let { "$it ($name)" } ?: name
+            byte(EXTRA, label, name, options)
+        }
+    }
 
     private fun range(from: Int, to: Int) = (from..to).map { it.toString() }
 }

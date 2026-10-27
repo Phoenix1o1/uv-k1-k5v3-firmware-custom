@@ -4,19 +4,15 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputFilter
 import android.text.InputType
-import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
-import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -26,21 +22,29 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import io.github.phoenix1o1.uvbridge.FileSaver
+import io.github.phoenix1o1.uvbridge.HomeActivity
+import io.github.phoenix1o1.uvbridge.Library
 import io.github.phoenix1o1.uvbridge.R
+import io.github.phoenix1o1.uvbridge.Ui
 
 /**
  * Shows and edits the channels and settings of a CHIRP image, through
- * [Channels] and [Settings]. Edits change the image in memory; "Save" writes
- * the file, "Upload" hands the edited image back to [ChirpActivity].
+ * [Channels] and the [Settings] of the driver picked for the image. Edits
+ * change the image in memory; "Save" writes the file, "Upload" hands the
+ * edited image back to [HomeActivity].
  */
 class ImageEditorActivity : Activity() {
 
     private lateinit var image: ChirpImage
+    private lateinit var driver: ChirpDriver
+    private lateinit var settings: List<Setting>
     private lateinit var fileName: String
     private var fileUri: Uri? = null
     private var modified = false
 
     private lateinit var title: TextView
+    private lateinit var subtitle: TextView
+    private lateinit var tabs: List<TextView>
     private lateinit var list: ListView
     private lateinit var filterRow: LinearLayout
     private lateinit var filter: Spinner
@@ -52,7 +56,10 @@ class ImageEditorActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val bytes = (savedInstanceState?.getByteArray(EXTRA_IMAGE) ?: intent.getByteArrayExtra(EXTRA_IMAGE))
-        image = try { ChirpImage.parse(bytes!!) } catch (e: Exception) { finish(); return }
+        val name = intent.getStringExtra(EXTRA_DRIVER)
+        driver = Library(this).drivers().firstOrNull { it.name == name } ?: ChirpDriver.BUILTIN
+        settings = Settings.forDriver(driver)
+        image = try { ChirpImage.parse(bytes!!, driver) } catch (e: Exception) { finish(); return }
         fileName = intent.getStringExtra(EXTRA_NAME) ?: "image.img"
         fileUri = intent.data
         modified = savedInstanceState?.getBoolean(STATE_MODIFIED) ?: false
@@ -68,44 +75,49 @@ class ImageEditorActivity : Activity() {
 
     // ---- layout ----
 
-    private fun dp(v: Int) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
+    private fun dp(v: Int) = Ui.dp(this, v)
 
     private fun buildLayout() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        title = TextView(this).apply { setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f) }
+        title = Ui.text(this, "", 20f, bold = true)
+        subtitle = Ui.text(this, "", 13f, R.color.muted).apply { setPadding(0, dp(2), 0, dp(12)) }
         root.addView(title)
+        root.addView(subtitle)
 
-        val tabs = LinearLayout(this)
-        fun tab(text: String, onClick: () -> Unit) = Button(this).apply {
-            this.text = text; isAllCaps = false; setOnClickListener { onClick() }
-            tabs.addView(this, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        }
-        tab("Channels") { showSettings = false; refresh() }
-        tab("Settings") { showSettings = true; refresh() }
-        tab("Save") { save() }
-        tab("Upload") { uploadEdited() }
-        root.addView(tabs)
+        // Channels | Settings, then the file actions
+        val bar = LinearLayout(this)
+        val channelsTab = Ui.button(this, "Channels") { showSettings = false; refresh() }
+        val settingsTab = Ui.button(this, "Settings") { showSettings = true; refresh() }
+        tabs = listOf(channelsTab, settingsTab)
+        bar.addView(channelsTab, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        bar.addView(settingsTab, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(6) })
+        root.addView(bar)
+        root.addView(Ui.buttonRow(this, Ui.button(this, "Save") { save() }, Ui.button(this, "Upload to radio") { uploadEdited() })
+            .apply { setPadding(0, dp(8), 0, 0) })
 
-        filterRow = LinearLayout(this)
+        filterRow = LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, 0) }
         filter = Spinner(this)
         filterRow.addView(filter, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        filterRow.addView(Button(this).apply { text = "Add"; setOnClickListener { addChannel() } })
+        filterRow.addView(Ui.button(this, "+ Add") { addChannel() })
         root.addView(filterRow)
         filter.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) = refresh()
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
 
-        list = ListView(this)
-        root.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        // the list sits on a card
+        list = ListView(this).apply {
+            divider = android.graphics.drawable.ColorDrawable(Ui.color(this@ImageEditorActivity, R.color.outline))
+            dividerHeight = dp(1)
+            background = Ui.rounded(Ui.color(this@ImageEditorActivity, R.color.surface), dp(20).toFloat(),
+                Ui.color(this@ImageEditorActivity, R.color.outline), dp(1))
+            clipToOutline = true
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+        }
+        root.addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f).apply { topMargin = dp(10) })
         list.setOnItemClickListener { _, _, pos, _ -> if (showSettings) editSetting(pos) else editChannel(channels[pos]) }
 
-        val side = dp(12)
-        root.setOnApplyWindowInsetsListener { v, insets ->
-            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
-            v.setPadding(bars.left + side, bars.top + side, bars.right + side, bars.bottom)
-            WindowInsets.CONSUMED
-        }
+        Ui.keepClearOfBars(root, dp(16), dp(8))
         setContentView(root)
         updateFilterChoices(0)
     }
@@ -123,11 +135,16 @@ class ImageEditorActivity : Activity() {
     }
 
     private fun refresh() {
-        title.text = fileName + if (modified) "  •  modified" else ""
+        title.text = fileName
+        subtitle.text = (if (modified) "Modified  •  " else "") + "Driver: ${driver.name}"
+        tabs.forEachIndexed { i, t ->
+            val on = (i == 1) == showSettings
+            t.setTextColor(Ui.color(this, if (on) R.color.on_accent else R.color.on_accent_soft))
+            t.background = Ui.rounded(Ui.color(this, if (on) R.color.accent else R.color.accent_soft), dp(24).toFloat())
+        }
         filterRow.visibility = if (showSettings) View.GONE else View.VISIBLE
         if (showSettings) {
-            list.adapter = rows(Settings.ALL.map { s -> s.label to s.display(image.memory) },
-                Settings.ALL.map { it.group })
+            list.adapter = rows(settings.map { s -> s.label to s.display(image.memory) }, settings.map { it.group })
             return
         }
         val all = (1..Channels.COUNT).mapNotNull { Channels.read(image.memory, it) }
@@ -159,16 +176,16 @@ class ImageEditorActivity : Activity() {
         override fun getItem(p: Int) = items[p]
         override fun getItemId(p: Int) = p.toLong()
         override fun getView(p: Int, convert: View?, parent: ViewGroup?): View {
-            val box = LinearLayout(this@ImageEditorActivity).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8))
+            val c = this@ImageEditorActivity
+            val box = LinearLayout(c).apply {
+                orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(10), dp(12), dp(10))
             }
             if (groups != null && (p == 0 || groups[p] != groups[p - 1]))
-                box.addView(TextView(this@ImageEditorActivity).apply {
-                    text = groups[p]; setTypeface(typeface, Typeface.BOLD)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f); setPadding(0, dp(12), 0, dp(6))
+                box.addView(Ui.text(c, groups[p].uppercase(), 12f, R.color.accent, bold = true).apply {
+                    letterSpacing = 0.08f; setPadding(0, dp(if (p == 0) 4 else 14), 0, dp(8))
                 })
-            box.addView(TextView(this@ImageEditorActivity).apply { text = items[p].first; setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f) })
-            box.addView(TextView(this@ImageEditorActivity).apply { text = items[p].second; alpha = 0.7f })
+            box.addView(Ui.text(c, items[p].first, 16f))
+            box.addView(Ui.text(c, items[p].second, 13f, R.color.muted).apply { setPadding(0, dp(2), 0, 0) })
             return box
         }
     }
@@ -253,7 +270,7 @@ class ImageEditorActivity : Activity() {
     // ---- settings ----
 
     private fun editSetting(pos: Int) {
-        val s = Settings.ALL[pos]
+        val s = settings[pos]
         val read = s.text
         val write = s.setText
         if (read != null && write != null) {
@@ -311,7 +328,8 @@ class ImageEditorActivity : Activity() {
     private fun saveCopy() {
         val base = fileName.removeSuffix(".img").substringBefore("-edit")
         val name = "$base-edit-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.img"
-        FileSaver(this).save(name, image.toBytes(), { fileName = name; fileUri = null; modified = false; refresh() }, { }, "CHIRP")
+        FileSaver(this).save(name, image.toBytes(), { fileName = name; fileUri = null; modified = false; refresh() }, { },
+            HomeActivity.CHIRP_FOLDER)
     }
 
     private fun uploadEdited() {
@@ -339,12 +357,13 @@ class ImageEditorActivity : Activity() {
     companion object {
         const val EXTRA_IMAGE = "image"
         const val EXTRA_NAME = "name"
+        const val EXTRA_DRIVER = "driver"
         private const val STATE_MODIFIED = "modified"
         private const val DECIMAL = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
 
-        fun intent(context: Context, image: ByteArray, name: String, uri: Uri?) =
+        fun intent(context: Context, image: ByteArray, name: String, uri: Uri?, driver: String) =
             Intent(context, ImageEditorActivity::class.java).setData(uri)
-                .putExtra(EXTRA_IMAGE, image).putExtra(EXTRA_NAME, name)
+                .putExtra(EXTRA_IMAGE, image).putExtra(EXTRA_NAME, name).putExtra(EXTRA_DRIVER, driver)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
     }
 }

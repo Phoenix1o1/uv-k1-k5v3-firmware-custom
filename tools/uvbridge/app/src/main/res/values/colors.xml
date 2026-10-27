@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_bg">#24262A</color>
+
+    <!-- App palette; values-night has the dark one. -->
+    <color name="bg">#F3F5F0</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="on_surface">#1B1D19</color>
+    <color name="muted">#5D6458</color>
+    <color name="outline">#DFE3D9</color>
+    <color name="accent">#4A7A28</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="accent_soft">#DDEBCB</color>
+    <color name="on_accent_soft">#1E3209</color>
 </resources>

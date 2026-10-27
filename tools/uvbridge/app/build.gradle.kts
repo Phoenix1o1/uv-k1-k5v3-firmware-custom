@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.phoenix1o1.uvbridge"
         minSdk = 30          // Android 11: WindowInsets.Type, insetsController
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.0"
+        versionCode = 9
+        versionName = "0.6.0"
     }
 
     buildTypes {
@@ -36,7 +36,8 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    // A real CHIRP image for the round-trip test: ./gradlew test -Pchirp.img=/path/file.img
-    project.findProperty("chirp.img")?.let { systemProperty("chirp.img", it) }
+    // A real CHIRP image and driver for the round-trip tests (never committed):
+    // ./gradlew test -Pchirp.img=/path/file.img -Pchirp.driver=/path/f4hwn.chirp.v6.3.0.py
+    for (p in listOf("chirp.img", "chirp.driver")) project.findProperty(p)?.let { systemProperty(p, it) }
     testLogging { showStandardStreams = true }
 }

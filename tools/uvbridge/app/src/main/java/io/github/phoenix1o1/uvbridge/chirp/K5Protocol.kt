@@ -16,7 +16,7 @@ class Timeout : RadioException("No answer from the radio (timeout)")
  * The Quansheng UV-K5 / UV-K1 programming protocol, as the F4HWN CHIRP driver
  * (f4hwn.chirp.v6.3.0.py) speaks it and App/app/uart.c answers it.
  *
- * Packet: AB CD | len | 00 | obfuscated(payload + CRC16-XMODEM LE) | DC BA.
+ * Packet: AB CD | len (LE u16) | obfuscated(payload + CRC16-XMODEM LE) | DC BA.
  * Payload: message id (LE u16), body length (LE u16), body.
  * Replies use the same frame; their CRC is not meaningful and is ignored.
  */
@@ -69,8 +69,8 @@ class K5Protocol(
      * a timeout (reads and writes are idempotent). Replies that do not match,
      * such as a late answer to an earlier try, are skipped.
      */
-    private fun exchange(cmd: ByteArray, timeout: Int, matches: (ByteArray) -> Boolean): ByteArray? {
-        repeat(TRIES) {
+    private fun exchange(cmd: ByteArray, timeout: Int, tries: Int = TRIES, matches: (ByteArray) -> Boolean): ByteArray? {
+        repeat(tries) {
             send(cmd)
             val deadline = System.currentTimeMillis() + timeout
             try {
@@ -82,6 +82,18 @@ class K5Protocol(
 
     private fun isReply(r: ByteArray, id: Int, offset: Int) =
         r.size >= 6 && r[0] == id.toByte() && r[1] == 0x05.toByte() && r[4] == lo(offset) && r[5] == hi(offset)
+
+    /**
+     * Any other command: message [id] with [data], waiting for message
+     * [replyId]; returns the reply's data (after its id and length). Sent
+     * up to [tries] times, for commands that can safely be repeated.
+     */
+    fun command(id: Int, data: ByteArray, replyId: Int, timeout: Int = timeoutMs, tries: Int = 1): ByteArray {
+        val cmd = byteArrayOf(lo(id), hi(id), lo(data.size), hi(data.size)) + data
+        val r = exchange(cmd, timeout, tries) { it.size >= 4 && it[0] == lo(replyId) && it[1] == hi(replyId) }
+            ?: throw Timeout()
+        return r.copyOfRange(4, r.size)
+    }
 
     /** Restarts the radio, as CHIRP does after an upload. No answer. */
     fun reset() = send(byteArrayOf(0xdd.toByte(), 0x05, 0x00, 0x00))
@@ -99,7 +111,7 @@ class K5Protocol(
             if (b != 0xCD) continue          // may itself be the AB of the real header
             val len = readByte(deadline)
             b = readByte(deadline)
-            if (b != 0x00) continue
+            if (b != 0x00) continue          // replies are shorter than 256 bytes
             val body = readExact(len, deadline)
             val footer = readExact(4, deadline)
             if (footer[2] == 0xDC.toByte() && footer[3] == 0xBA.toByte()) return xor(body)
@@ -149,10 +161,12 @@ class K5Protocol(
             return crc and 0xffff
         }
 
-        fun frame(payload: ByteArray): ByteArray {
+        /** The length is a LE u16; an odd payload is padded with a zero byte, as UV Studio does. */
+        fun frame(message: ByteArray): ByteArray {
+            val payload = if (message.size % 2 == 0) message else message + 0
             val crc = crc16xmodem(payload)
             val body = xor(payload + byteArrayOf(lo(crc), hi(crc)))
-            return byteArrayOf(0xab.toByte(), 0xcd.toByte(), payload.size.toByte(), 0) + body +
+            return byteArrayOf(0xab.toByte(), 0xcd.toByte(), lo(payload.size), hi(payload.size)) + body +
                 byteArrayOf(0xdc.toByte(), 0xba.toByte())
         }
 

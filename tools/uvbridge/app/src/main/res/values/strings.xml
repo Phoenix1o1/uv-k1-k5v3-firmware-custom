@@ -6,13 +6,40 @@
     <string name="save_failed">Could not save the file: %1$s</string>
     <string name="downloading">Downloading %1$s</string>
     <string name="webview_too_old">Android System WebView is too old. Update it from the Play Store.</string>
-    <string name="chirp_label">CHIRP Image</string>
+
+    <string name="home_tagline">%1$s · UV-K1 / UV-K5 V3 · F4HWN</string>
+    <string name="home_radio">Radio</string>
+    <string name="home_not_connected">Not connected yet. Each action connects through the USB cable.</string>
+    <string name="home_connected">Connected: firmware %1$s</string>
+    <string name="home_driver">CHIRP driver: %1$s (%2$s)</string>
+    <string name="home_hint">Connect the radio with the USB cable through an OTG adapter.</string>
+    <string name="from_repo">From repository</string>
+    <string name="from_file">From file</string>
+
+    <string name="studio_title">UV Studio</string>
+    <string name="studio_text">Firmware flashing, slots, apps, calibration, K5Viewer and RF Log, in the live UV Studio site.</string>
+    <string name="studio_open">Open UV Studio</string>
+
     <string name="chirp_title">CHIRP image</string>
-    <string name="chirp_intro">Reads, writes and edits CHIRP .img files for the F4HWN firmware (UV-K1 / UV-K5 V3), as CHIRP does. Calibration is never written.</string>
+    <string name="chirp_intro">Reads, writes and edits CHIRP .img files as CHIRP does. Calibration is never written.</string>
     <string name="chirp_download">Download from radio</string>
-    <string name="chirp_upload">Upload image to radio</string>
-    <string name="chirp_edit">View / edit an image</string>
+    <string name="chirp_upload">Upload</string>
+    <string name="chirp_edit">View / edit</string>
     <string name="chirp_write">Write</string>
     <string name="chirp_wait">Wait for the transfer to finish.</string>
     <string name="chirp_confirm">Radio firmware: %1$s\nBackup saved to Downloads/CHIRP: %2$s\n\nWrite %3$s (%4$s)?\n\nChannels, names, scan lists and settings are replaced. Do not unplug the cable until it is done.</string>
+
+    <string name="assets_title">Firmware assets</string>
+    <string name="assets_text">Fonts and menu texts of the v7 firmwares. Installs the pack of the exact build the radio runs, from the app or the repository.</string>
+    <string name="assets_install">Install on radio</string>
+    <string name="assets_already">The assets of this firmware are already installed and valid. Write them again?</string>
+    <string name="assets_write_again">Write again</string>
+    <string name="assets_pick_firmware">Firmware to download (to Downloads/F4HWN)</string>
+
+    <string name="drivers_title">CHIRP drivers</string>
+    <string name="drivers_text">The image layout follows the driver made for the radio\'s firmware version, else the last used one, else the built-in 6.3 layout.</string>
+    <string name="drivers_manage">Drivers</string>
+    <string name="drivers_pick">Driver to download (to Downloads/CHIRP/drivers)</string>
+    <string name="drivers_use">Use when no driver matches the radio</string>
+    <string name="drivers_remove">Remove</string>
 </resources>

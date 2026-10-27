@@ -139,10 +139,12 @@ class RadioCloneTest {
 
 /**
  * The radio side of App/app/uart.c: checks the CRC and the session timestamp,
- * answers 0x0514 / 0x051B / 0x051D, restarts on 0x05DD. Delivers its replies
- * in random small chunks, with stray bytes between them.
+ * answers 0x0514 / 0x051B / 0x051D, restarts on 0x05DD, and with a
+ * [buildId] (a v7 firmware) runs the asset commands 0x0750..0x0756 on one
+ * asset zone. Delivers its replies in random small chunks, with stray bytes
+ * between them.
  */
-class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
+class FakeRadio(private val bootloader: Boolean = false, private val buildId: ByteArray? = null) : SerialLink {
     val mem = ByteArray(0x10000) { 0xff.toByte() }.also { m ->
         for (i in ChirpImage.CAL_START until ChirpImage.MEM_SIZE) m[i] = (i * 13).toByte()   // calibration
     }
@@ -155,6 +157,12 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
     var slowWrites = Int.MAX_VALUE
     /** Writes (1-based) whose reply is lost. */
     val dropReplyOfWrite = mutableSetOf<Int>()
+    /** The asset zone of the running slot, its write offsets in order, and whether the firmware draws with it. */
+    val zone = ByteArray(0x4000) { 0xff.toByte() }
+    val assetWrites = mutableListOf<Int>()
+    var assetsLoaded = false
+    /** Asset writes (1-based) whose reply is lost. */
+    val dropReplyOfAssetWrite = mutableSetOf<Int>()
     private var readyAt = 0L
     private var timestamp: ByteArray? = null
     private val out = ArrayDeque<Byte>()
@@ -196,6 +204,27 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
                 reply(0x051E, byteArrayOf(p[4], p[5]))
             }
             0x05DD -> wasReset = true
+            0x0750 -> if (buildId != null) {
+                reply(0x0751, byteArrayOf(RUNNING_SLOT, if (zoneValid()) 0 else 1, RUNNING_SLOT, if (assetsLoaded) 1 else 0) +
+                    zone.copyOf(32) + buildId)
+            }
+            0x0752 -> if (buildId != null) {
+                val ok = p.copyOfRange(6, 10).contentEquals(timestamp)
+                if (ok) { zone.fill(0xff.toByte()); assetsLoaded = false }
+                reply(0x0753, byteArrayOf(RUNNING_SLOT, if (ok) 0 else 8))
+            }
+            0x0754 -> if (buildId != null) {
+                val ok = p.copyOfRange(12, 16).contentEquals(timestamp)
+                val off = u16(p, 6); val len = u16(p, 10)
+                if (ok) for (i in 0 until len) zone[off + i] = (zone[off + i].toInt() and p[16 + i].toInt()).toByte()  // NOR
+                assetWrites += off
+                if (assetWrites.size in dropReplyOfAssetWrite) return
+                reply(0x0755, byteArrayOf(RUNNING_SLOT, if (ok) 0 else 8))
+            }
+            0x0756 -> if (buildId != null) {
+                assetsLoaded = zoneValid()
+                reply(0x0757, byteArrayOf(RUNNING_SLOT, if (assetsLoaded) 0 else 5))
+            }
         }
     }
 
@@ -216,4 +245,12 @@ class FakeRadio(private val bootloader: Boolean = false) : SerialLink {
     }
 
     private fun u16(b: ByteArray, o: Int) = (b[o].toInt() and 0xff) or ((b[o + 1].toInt() and 0xff) shl 8)
+
+    /** As MB_AssetValidate: header, size, CRC, and this firmware's build. */
+    private fun zoneValid(): Boolean = try {
+        val size = AssetPack.HEADER_SIZE + AssetPack.u32(zone, 8).toInt()
+        size <= zone.size && AssetPack(zone.copyOf(size)).buildId == AssetPack.hex(buildId!!, 0, 16)
+    } catch (e: Exception) { false }
+
+    companion object { const val RUNNING_SLOT: Byte = 1 }
 }
