@@ -13,6 +13,7 @@
     <string name="home_connected">Connected: firmware %1$s</string>
     <string name="home_driver">CHIRP driver: %1$s (%2$s)</string>
     <string name="home_hint">Connect the radio with the USB cable through an OTG adapter.</string>
+    <string name="home_open">Home</string>
     <string name="from_repo">From repository</string>
     <string name="from_file">From file</string>
 

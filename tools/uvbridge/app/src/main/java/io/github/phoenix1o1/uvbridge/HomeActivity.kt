@@ -61,6 +61,7 @@ class HomeActivity : Activity() {
     private lateinit var files: FileSaver
     private lateinit var library: Library
     private lateinit var scroll: ScrollView
+    private lateinit var chirpCard: View
     private lateinit var radioLine: TextView
     private lateinit var driverLine: TextView
     private lateinit var status: TextView
@@ -87,9 +88,20 @@ class HomeActivity : Activity() {
         library = Library(this)
         buildLayout()
         showPicks()
+        showRequested(intent)
         val filter = IntentFilter(ACTION_PERMISSION)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else @Suppress("UnspecifiedRegisterReceiverFlag") registerReceiver(receiver, filter)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        showRequested(intent)
+    }
+
+    /** The launcher's long-press shortcut "CHIRP image" opens the home screen at that card. */
+    private fun showRequested(intent: Intent?) {
+        if (intent?.action == ACTION_CHIRP) scroll.post { scroll.smoothScrollTo(0, chirpCard.top) }
     }
 
     // ---- layout ----
@@ -126,10 +138,11 @@ class HomeActivity : Activity() {
             action(R.string.studio_open, filled = true) { startActivity(Intent(this, MainActivity::class.java)) }))
 
         // CHIRP image
-        column.addView(section(R.drawable.ic_chirp, R.string.chirp_title, R.string.chirp_intro,
+        chirpCard = section(R.drawable.ic_chirp, R.string.chirp_title, R.string.chirp_intro,
             action(R.string.chirp_download, filled = true) { download() },
             action(R.string.chirp_upload) { pickFile(PICK_IMAGE) },
-            action(R.string.chirp_edit) { pickFile(PICK_EDIT) }))
+            action(R.string.chirp_edit) { pickFile(PICK_EDIT) })
+        column.addView(chirpCard)
 
         // firmware assets
         column.addView(section(R.drawable.ic_assets, R.string.assets_title, R.string.assets_text,
@@ -481,6 +494,7 @@ class HomeActivity : Activity() {
     }
 
     companion object {
+        const val ACTION_CHIRP = "io.github.phoenix1o1.uvbridge.CHIRP"
         private const val ACTION_PERMISSION = "io.github.phoenix1o1.uvbridge.CHIRP_USB_PERMISSION"
         private const val PICK_IMAGE = 1
         private const val PICK_EDIT = 2

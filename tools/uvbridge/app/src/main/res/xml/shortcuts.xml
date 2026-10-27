@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long press on the launcher icon: straight to UV Studio, or to the CHIRP image card. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="studio"
+        android:icon="@drawable/ic_shortcut_studio"
+        android:shortcutShortLabel="@string/studio_title"
+        android:shortcutLongLabel="@string/studio_open">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="io.github.phoenix1o1.uvbridge"
+            android:targetClass="io.github.phoenix1o1.uvbridge.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="chirp"
+        android:icon="@drawable/ic_shortcut_chirp"
+        android:shortcutShortLabel="@string/chirp_title"
+        android:shortcutLongLabel="@string/chirp_title">
+        <intent
+            android:action="io.github.phoenix1o1.uvbridge.CHIRP"
+            android:targetPackage="io.github.phoenix1o1.uvbridge"
+            android:targetClass="io.github.phoenix1o1.uvbridge.HomeActivity" />
+    </shortcut>
+</shortcuts>

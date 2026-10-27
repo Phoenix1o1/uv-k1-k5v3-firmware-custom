@@ -16,7 +16,10 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.content.res.ColorStateList
+import android.view.Gravity
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -52,6 +55,7 @@ class MainActivity : Activity() {
         // padding on the WebView itself does not move the page.
         web = WebView(this)
         root = FrameLayout(this).apply { addView(web) }
+        addHomeButton()
         setContentView(root)
         keepClearOfSystemBars()
         web.settings.apply {
@@ -129,6 +133,30 @@ class MainActivity : Activity() {
         else web.loadUrl("$UV_STUDIO_ORIGIN/uvstudio/")
     }
 
+    /** A small round button in the bottom-left corner, back to the app's home screen. */
+    private fun addHomeButton() {
+        val size = Ui.dp(this, 40)
+        root.addView(ImageButton(this).apply {
+            setImageResource(R.drawable.ic_home)
+            imageTintList = ColorStateList.valueOf(getColor(R.color.on_accent))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(getColor(R.color.accent))
+            }
+            alpha = 0.8f
+            contentDescription = getString(R.string.home_open)
+            setOnClickListener { goHome() }
+        }, FrameLayout.LayoutParams(size, size, Gravity.BOTTOM or Gravity.START).apply {
+            val m = Ui.dp(this@MainActivity, 12); setMargins(m, m, m, m)
+        })
+    }
+
+    /** The home screen: the one below, or a new one when UV Studio was opened on its own
+     *  (cable plugged in, launcher shortcut). */
+    private fun goHome() {
+        if (isTaskRoot) startActivity(Intent(this, HomeActivity::class.java))
+        finish()
+    }
+
     /** Android 15 draws apps edge to edge: pad the page off the status bar,
      *  the navigation bar and the camera cutout. */
     private fun keepClearOfSystemBars() {
@@ -171,7 +199,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (::web.isInitialized && web.canGoBack()) web.goBack()
-        else @Suppress("DEPRECATION") super.onBackPressed()
+        else goHome()
     }
 
     override fun onDestroy() {
