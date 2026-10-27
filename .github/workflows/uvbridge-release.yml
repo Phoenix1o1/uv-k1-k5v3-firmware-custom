@@ -2,14 +2,14 @@
 # tools/uvbridge/release/uvbridge-<version>.apk, publish it as the release
 # uvbridge-v<version> (tag created here, on that commit) with the notes in
 # tools/uvbridge/release/uvbridge-<version>.md. Versions already released
-# are left alone.
+# are left alone, so a change to this file also publishes any APK not yet
+# released.
 name: UV Bridge release
 
 on:
   push:
     branches: [uvbridge]
-    paths: ['tools/uvbridge/release/*.apk']
-  workflow_dispatch:
+    paths: ['tools/uvbridge/release/*.apk', '.github/workflows/uvbridge-release.yml']
 
 permissions:
   contents: write
