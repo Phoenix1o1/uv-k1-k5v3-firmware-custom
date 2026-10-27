@@ -1,0 +1,3 @@
+- Download / Upload no longer do nothing silently: every message (no cable found, waiting for USB permission, cable in use by UV Studio, errors) is shown and scrolled into view, and a tap while a transfer runs says so.
+- An unexpected error can no longer leave the buttons unresponsive until the app is restarted.
+- Driver files are read in a lighter way.
