@@ -1,0 +1,2 @@
+- UV Studio has a home button (bottom left), and Back from it leads to the home screen with CHIRP image, firmware assets and drivers, also when UV Studio was opened from an old home-screen icon or by plugging in the cable.
+- Long press on the app icon: shortcuts to UV Studio and to CHIRP image.
