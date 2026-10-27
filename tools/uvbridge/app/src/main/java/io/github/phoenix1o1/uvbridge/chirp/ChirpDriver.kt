@@ -71,8 +71,7 @@ class ChirpDriver(
          * of the app can follow.
          */
         fun parse(name: String, source: String): ChirpDriver {
-            val format = Regex("""MEM_FORMAT\s*=\s*""" + "\"\"\"" + """(.*?)""" + "\"\"\"", RegexOption.DOT_MATCHES_ALL)
-                .find(source)?.groupValues?.get(1)
+            val format = between(source, Regex("MEM_FORMAT\\s*=\\s*\"\"\"").find(source)?.range?.last, "\"\"\"")
                 ?: throw IllegalArgumentException("$name is not a CHIRP driver (no MEM_FORMAT).")
             val fields = MemFormat.parse(format)
             val ints = Regex("""(?m)^([A-Z_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)\b""").findAll(source)
@@ -84,6 +83,13 @@ class ChirpDriver(
                 stringLists(source), labels(source), settingLists(source), advanced(source))
             driver.check()
             return driver
+        }
+
+        /** The text after index [at] up to [end]; plain searches, no backtracking regex on big files. */
+        fun between(s: String, at: Int?, end: String): String? {
+            if (at == null) return null
+            val stop = s.indexOf(end, at + 1).takeIf { it >= 0 } ?: return null
+            return s.substring(at + 1, stop)
         }
 
         /** NAME = ["a", "b", ...] (several lines allowed), and NAME = [...] + [...]; others are skipped. */
@@ -238,13 +244,23 @@ object MemFormat {
         "u32" to 4, "ul32" to 4, "i32" to 4, "il32" to 4)
 
     fun parse(format: String): Map<String, ChirpDriver.Field> {
-        val text = format.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
-            .replace(Regex("//[^\\n]*"), " ")
+        val text = withoutBlockComments(format).replace(Regex("//[^\\n]*"), " ")
         val tokens = Regex("""#seekto|#seek|[A-Za-z_][A-Za-z0-9_]*|0x[0-9A-Fa-f]+|\d+|[{}\[\];:,]""")
             .findAll(text).map { it.value }.toList()
         val out = linkedMapOf<String, ChirpDriver.Field>()
         Parser(tokens, out).block("", top = true)
         return out
+    }
+
+    private fun withoutBlockComments(s: String): String {
+        val out = StringBuilder()
+        var i = 0
+        while (true) {
+            val start = s.indexOf("/*", i)
+            if (start < 0) return out.append(s, i, s.length).toString()
+            out.append(s, i, start).append(' ')
+            i = s.indexOf("*/", start + 2).let { if (it < 0) s.length else it + 2 }
+        }
     }
 
     private class Parser(val t: List<String>, val out: MutableMap<String, ChirpDriver.Field>) {

@@ -55,7 +55,8 @@ import java.util.concurrent.Executors
  */
 class HomeActivity : Activity() {
 
-    private val worker = Executors.newSingleThreadExecutor()
+    // A roomy stack: driver files are parsed on it.
+    private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "radio", 8L shl 20) }
     private lateinit var usb: UsbManager
     private lateinit var files: FileSaver
     private lateinit var library: Library
@@ -241,7 +242,7 @@ class HomeActivity : Activity() {
     /** A firmware file was picked: keep its asset pack and write it. */
     private fun firmwareFile(name: String, bytes: ByteArray) {
         val stored = library.addPack(name, bytes)
-            ?: return run { status.text = "$name has no asset pack (only v7 firmware packages carry one); nothing to install." }
+            ?: return run { show("$name has no asset pack (only v7 firmware packages carry one); nothing to install.") }
         showPicks()
         installAssets(stored)
     }
@@ -317,12 +318,12 @@ class HomeActivity : Activity() {
                 PICK_DRIVER -> {
                     val d = library.addDriver(name, bytes)
                     showPicks()
-                    status.text = "Driver kept: ${d.name}\n${d.version}"
+                    show("Driver kept: ${d.name}\n${d.version}")
                 }
                 PICK_FIRMWARE -> firmwareFile(name, bytes)
             }
         } catch (e: Exception) {
-            status.text = e.message ?: e.toString()
+            show(e.message ?: e.toString())
         }
     }
 
@@ -338,10 +339,10 @@ class HomeActivity : Activity() {
 
     /** Picks the cable, opens it, says hello, runs [task] on the worker; its result is shown. */
     private fun withRadio(task: (Session) -> String) {
-        if (busy) return
+        if (busy) return toast(getString(R.string.chirp_wait))
         val drivers = UsbSerialProber.getDefaultProber().findAllDrivers(usb)
         when (drivers.size) {
-            0 -> status.text = "No USB serial cable found. Check the cable and the OTG adapter."
+            0 -> show("No USB serial cable found. Check the cable and the OTG adapter.")
             1 -> withPermission(drivers[0], task)
             else -> AlertDialog.Builder(this)
                 .setTitle(R.string.pick_device)
@@ -352,7 +353,8 @@ class HomeActivity : Activity() {
 
     private fun withPermission(driver: UsbSerialDriver, task: (Session) -> String) {
         if (usb.hasPermission(driver.device)) return start(driver, task)
-        onPermission = { granted -> if (granted) start(driver, task) else status.text = "USB permission denied." }
+        onPermission = { granted -> if (granted) start(driver, task) else show("USB permission denied.") }
+        show("Waiting for the USB permission…")
         val intent = Intent(ACTION_PERMISSION).setPackage(packageName)
         val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
         usb.requestPermission(driver.device, PendingIntent.getBroadcast(this, 0, intent, flags))
@@ -360,7 +362,7 @@ class HomeActivity : Activity() {
 
     private fun start(driver: UsbSerialDriver, task: (Session) -> String) {
         val connection = usb.openDevice(driver.device)
-            ?: run { status.text = "Cannot open the cable."; return }
+            ?: run { show("Cannot open the cable. Close UV Studio if it is connected, then try again."); return }
         background("Connecting…") {
             try {
                 val port = driver.ports[0].apply { open(connection) }
@@ -385,12 +387,12 @@ class HomeActivity : Activity() {
 
     /** Runs [task] on the worker with the buttons off; shows its result or error. */
     private fun background(first: String = "Working…", task: () -> String) {
-        if (busy) return
+        if (busy) return toast(getString(R.string.chirp_wait))
         setBusy(true)
-        status.text = first
-        scroll.smoothScrollTo(0, 0)
+        show(first)
         worker.execute {
-            val result = try { task() } catch (e: Exception) {
+            // Throwable: whatever goes wrong, the buttons come back.
+            val result = try { task() } catch (e: Throwable) {
                 when (e) {
                     is RadioException, is IllegalArgumentException -> e.message ?: e.toString()
                     else -> "Error: ${e.message ?: e}"
@@ -408,7 +410,13 @@ class HomeActivity : Activity() {
         status.text = "$stage… ${done * 100 / total}%"
     }
 
-    private fun status(text: String) = runOnUiThread { status.text = text }
+    private fun status(text: String) = runOnUiThread { show(text) }
+
+    /** A message in the status card, scrolled into view. */
+    private fun show(text: String) {
+        status.text = text
+        scroll.smoothScrollTo(0, 0)
+    }
 
     /** Saves on the UI thread (FileSaver shows a toast); throws if it failed. */
     private fun save(name: String, bytes: ByteArray, folder: String) {
