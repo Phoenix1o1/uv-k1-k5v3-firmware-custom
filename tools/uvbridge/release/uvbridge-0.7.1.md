@@ -1,0 +1,2 @@
+- The CHIRP card shows the driver's version (for example "F4HWN 6.3.0" or "F4HWN 6.3.0 (built-in)") and why it was picked: made for the radio's version, last used, newest kept, or built into the app. A downloaded driver is no longer hidden behind the built-in layout.
+- Buttons stay on one line; the driver buttons are now Drivers, Download and Load file.
