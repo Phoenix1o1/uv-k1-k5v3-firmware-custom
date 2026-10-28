@@ -72,7 +72,10 @@ object Ui {
         val fill = rounded(color(c, if (filled) R.color.accent else R.color.accent_soft), dp(c, 24).toFloat())
         background = RippleDrawable(ColorStateList.valueOf(0x33808080), fill, null)
         minHeight = dp(c, 44)
-        setPadding(dp(c, 16), dp(c, 10), dp(c, 16), dp(c, 10))
+        // one line, shrunk to fit a narrow button rather than broken
+        maxLines = 1
+        setAutoSizeTextTypeUniformWithConfiguration(11, 14, 1, TypedValue.COMPLEX_UNIT_SP)
+        setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 10))
         isClickable = true; isFocusable = true
         setOnClickListener { onClick() }
     }

@@ -44,7 +44,7 @@ UV Studio and CHIRP image.
 - **UV Studio**: opens the site. Its round button at the bottom left (or Back)
   returns home.
 - **CHIRP image**: Download from radio, Upload, View / edit. Below them, the
-  driver in use and its buttons (Drivers, From repository, From file).
+  driver in use (version and why it was picked) and its buttons (Drivers, Download, Load file).
 - **Advanced**: folded; firmware assets.
 - **About, credits & licences**.
 
@@ -83,11 +83,12 @@ appears in the editor's "From the driver" group.
 
 - The driver is picked automatically: the one made for the firmware version
   the radio reports (for an image, the version stored in it), else the last
-  one used, else the built-in layout (the 6.3 driver's). The CHIRP card shows
-  the driver in use and why.
-- **From repository** lists the drivers of the firmware releases and
-  downloads one (also saved to Downloads/CHIRP/drivers, for CHIRP's "Load
-  module" on a computer); **From file** loads one; **Drivers** lists them,
+  one used with a radio or chosen in Drivers, else the newest one kept, else
+  the built-in layout (the 6.3.0 driver's). The CHIRP card shows the driver's
+  version and why it was picked.
+- **Download** lists the drivers of the firmware releases and downloads one
+  (also saved to Downloads/CHIRP/drivers, for CHIRP's "Load module" on a
+  computer); **Load file** loads one; **Drivers** lists them,
   removes one or sets the one to use when none matches.
 - A driver that would write calibration memory, or stores the channels
   differently from the 6.3 layout, is refused.

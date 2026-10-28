@@ -16,8 +16,8 @@
     <string name="about_link">About, credits &amp; licences</string>
     <string name="home_hint">Connect the radio with the USB cable through an OTG adapter.</string>
     <string name="home_open">Home</string>
-    <string name="from_repo">From repository</string>
-    <string name="from_file">From file</string>
+    <string name="from_repo">Download</string>
+    <string name="from_file">Load file</string>
 
     <string name="studio_title">UV Studio</string>
     <string name="studio_text">Firmware flashing, slots, apps, calibration, K5Viewer and RF Log: the live UV Studio site, connected to the radio through the USB cable.</string>
@@ -43,8 +43,8 @@
     <string name="drivers_title">CHIRP drivers</string>
     <string name="drivers_manage">Drivers</string>
     <string name="drivers_pick">Download a CHIRP driver</string>
-    <string name="drivers_builtin">Built-in layout</string>
-    <string name="drivers_builtin_text">F4HWN 6.3, inside the app</string>
+    <string name="drivers_builtin">(built-in)</string>
+    <string name="drivers_builtin_text">The 6.3.0 driver\'s layout, inside the app</string>
     <string name="drivers_use">Use when no driver matches the radio</string>
     <string name="drivers_remove">Remove</string>
 

@@ -148,7 +148,7 @@ class ChirpDriver(
             Regex("""elname == "([A-Za-z0-9_]+)":\s*\n\s*if self\.upload_advanced""").findAll(source)
                 .map { it.groupValues[1] }.toSet()
 
-        val BUILTIN = ChirpDriver("Built-in (F4HWN 6.3)", "", ChirpImage.VENDOR, ChirpImage.MODEL,
+        val BUILTIN = ChirpDriver("Built-in (F4HWN 6.3.0)", "", ChirpImage.VENDOR, ChirpImage.MODEL,
             0xB190, 0xA178, 0xB000, builtinFields())
 
         /** The elements of f4hwn.chirp.v6.3.0.py's MEM_FORMAT that the app uses. */

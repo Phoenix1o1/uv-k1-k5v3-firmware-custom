@@ -213,8 +213,9 @@ class HomeActivity : Activity() {
         driverWhy.text = (if (pick.item.isBuiltin) "" else pick.item.name + " · ") + pick.why
     }
 
+    /** "F4HWN 6.3.0", "F4HWN 6.3.0 (built-in)". */
     private fun driverName(d: ChirpDriver) =
-        if (d.isBuiltin) getString(R.string.drivers_builtin) else "F4HWN ${d.firmwareVersion.ifEmpty { "?" }}"
+        "F4HWN ${d.firmwareVersion.ifEmpty { "?" }}" + if (d.isBuiltin) " " + getString(R.string.drivers_builtin) else ""
 
     // ---- CHIRP image ----
 
@@ -301,8 +302,7 @@ class HomeActivity : Activity() {
         val current = library.pickDriver(ChirpDriver.VERSION.find(lastFirmware)?.groupValues?.get(1) ?: "").item
         val rows = all.map { d ->
             val tag = if (d.name == current.name) "In use" else null
-            if (d.isBuiltin) Ui.Row(getString(R.string.drivers_builtin), getString(R.string.drivers_builtin_text), tag)
-            else Ui.Row(driverName(d), d.name, tag)
+            Ui.Row(driverName(d), if (d.isBuiltin) getString(R.string.drivers_builtin_text) else d.name, tag)
         }
         AlertDialog.Builder(this).setTitle(R.string.drivers_title)
             .setAdapter(Ui.rows(this, rows)) { _, i -> driverOptions(all[i]) }
@@ -406,7 +406,7 @@ class HomeActivity : Activity() {
                         showPicks()
                     }
                     val result = task(s)
-                    library.usedDriver(s.driver)
+                    if (!s.driver.isBuiltin) library.usedDriver(s.driver)    // the built-in is the fallback anyway
                     result
                 }
             } catch (e: Exception) {

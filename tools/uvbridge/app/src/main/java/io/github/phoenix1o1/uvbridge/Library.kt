@@ -46,11 +46,12 @@ class Library(context: Context) {
      * one made for that version, else the one used last, else the built-in.
      */
     fun pickDriver(version: String): Pick<ChirpDriver> {
-        val all = drivers()
-        if (version.isNotEmpty()) all.firstOrNull { !it.isBuiltin && it.firmwareVersion == version }
-            ?.let { return Pick(it, "made for v$version") }
+        val all = drivers()                             // built-in first, then newest first
+        if (version.isNotEmpty()) (all.drop(1) + all[0]).firstOrNull { it.firmwareVersion == version }
+            ?.let { return Pick(it, "made for the radio's v$version") }
         all.firstOrNull { it.name == prefs.getString(LAST_DRIVER, null) }?.let { return Pick(it, "last used") }
-        return Pick(ChirpDriver.BUILTIN, if (all.size > 1) "no driver for this version" else "no driver loaded")
+        all.getOrNull(1)?.let { return Pick(it, "newest kept") }
+        return Pick(ChirpDriver.BUILTIN, "built into the app")
     }
 
     /**
@@ -67,6 +68,7 @@ class Library(context: Context) {
         return if (takes(pick) != null) pick else all.first { takes(it) != null }
     }
 
+    /** Remembers [d] as the last used: a driver picked by hand, or used with a radio. */
     fun usedDriver(d: ChirpDriver) = prefs.edit().putString(LAST_DRIVER, d.name).apply()
 
     // ---- firmware asset packs ----
