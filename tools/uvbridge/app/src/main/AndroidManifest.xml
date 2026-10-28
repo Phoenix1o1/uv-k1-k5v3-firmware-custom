@@ -24,15 +24,24 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- UV Studio. singleTask: a cable plugged in again while flashing
-             (the radio restarts) comes back to the open page. -->
+        <!-- UV Studio. singleTask: one page, whatever opens it. Exported for
+             the launcher shortcut (and old home-screen icons, which it sends
+             to the home screen). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density">
-            <!-- Offered when a USB serial adapter is plugged in; choosing
-                 "always" also keeps the USB permission for that adapter. -->
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density" />
+
+        <!-- Offered when a USB serial adapter is plugged in ("always" also
+             keeps the USB permission for that adapter): opens the home
+             screen, or leaves UV Studio in front when it is open (a radio
+             restarting during a flash plugs in again). -->
+        <activity
+            android:name=".UsbAttachActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
@@ -40,6 +49,10 @@
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/usb_serial_devices" />
         </activity>
+
+        <activity
+            android:name=".AboutActivity"
+            android:exported="false" />
 
         <activity
             android:name=".chirp.ImageEditorActivity"

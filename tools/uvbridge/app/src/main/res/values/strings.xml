@@ -7,18 +7,21 @@
     <string name="downloading">Downloading %1$s</string>
     <string name="webview_too_old">Android System WebView is too old. Update it from the Play Store.</string>
 
-    <string name="home_tagline">%1$s · UV-K1 / UV-K5 V3 · F4HWN</string>
+    <string name="home_tagline">Companion app for the F4HWN firmware · UV-K1 / UV-K5 V3</string>
     <string name="home_radio">Radio</string>
     <string name="home_not_connected">Not connected yet. Each action connects through the USB cable.</string>
     <string name="home_connected">Connected: firmware %1$s</string>
-    <string name="home_driver">CHIRP driver: %1$s (%2$s)</string>
+    <string name="home_driver">Driver: %1$s</string>
+    <string name="advanced">Advanced</string>
+    <string name="about_link">About, credits &amp; licences</string>
     <string name="home_hint">Connect the radio with the USB cable through an OTG adapter.</string>
     <string name="home_open">Home</string>
     <string name="from_repo">From repository</string>
     <string name="from_file">From file</string>
 
     <string name="studio_title">UV Studio</string>
-    <string name="studio_text">Firmware flashing, slots, apps, calibration, K5Viewer and RF Log, in the live UV Studio site.</string>
+    <string name="studio_text">Firmware flashing, slots, apps, calibration, K5Viewer and RF Log: the live UV Studio site, connected to the radio through the USB cable.</string>
+    <string name="studio_credit">UV Studio by Armel FAUVEAU (F4HWN) · Apache License 2.0</string>
     <string name="studio_open">Open UV Studio</string>
 
     <string name="chirp_title">CHIRP image</string>
@@ -38,11 +41,21 @@
     <string name="assets_write_again">Write again</string>
 
     <string name="drivers_title">CHIRP drivers</string>
-    <string name="drivers_text">The image layout follows the driver made for the radio\'s firmware version, else the last used one, else the built-in 6.3 layout.</string>
     <string name="drivers_manage">Drivers</string>
     <string name="drivers_pick">Download a CHIRP driver</string>
     <string name="drivers_builtin">Built-in layout</string>
     <string name="drivers_builtin_text">F4HWN 6.3, inside the app</string>
     <string name="drivers_use">Use when no driver matches the radio</string>
     <string name="drivers_remove">Remove</string>
+
+    <string name="about_title">About</string>
+    <string name="about_app">A companion app for the F4HWN firmware: UV Studio with the USB cable, plus CHIRP images, CHIRP drivers and firmware assets on the phone. Licensed under the Apache License 2.0, like the firmware project. Not affiliated with Quansheng.</string>
+    <string name="about_studio">By Armel FAUVEAU (F4HWN), with K5Viewer and UVTools2 by the same author. Apache License 2.0. The app does not include UV Studio: it opens the live site and gives it the USB serial link it needs.</string>
+    <string name="about_firmware_title">F4HWN firmware</string>
+    <string name="about_firmware">Edition Fusion for the UV-K1 and UV-K5 V3, by Armel FAUVEAU (F4HWN), muzkr and contributors, based on the Dual Tachyon and Egzumer firmwares. Apache License 2.0. The programming protocol and the firmware asset format used here are the firmware\'s.</string>
+    <string name="about_chirp_title">CHIRP and its F4HWN driver</string>
+    <string name="about_chirp">The .img format and the channel and setting layout follow CHIRP (Dan Smith and contributors) and the F4HWN driver (F4HWN, JOC2, Egzumer, from the UV-K5 driver by SQ5BPF), licensed under the GNU GPL. Neither is included: driver files are downloaded or loaded when you ask, and only read.</string>
+    <string name="about_libraries_title">Libraries in the app</string>
+    <string name="about_libraries">usb-serial-for-android (Google Inc., Mike Wakerly; MIT License), AndroidX WebKit and Core (The Android Open Source Project) and the Kotlin standard library (JetBrains), both Apache License 2.0.</string>
+    <string name="about_texts">Notices and licence texts</string>
 </resources>

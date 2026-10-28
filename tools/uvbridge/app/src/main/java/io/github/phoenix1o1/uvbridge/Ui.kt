@@ -87,6 +87,12 @@ object Ui {
         }
     }
 
+    /** A hairline across a card. */
+    fun divider(c: Context) = View(c).apply {
+        setBackgroundColor(color(c, R.color.outline))
+        minimumHeight = dp(c, 1)
+    }
+
     /** Disabled buttons fade. */
     fun enable(v: View, on: Boolean) { v.isEnabled = on; v.alpha = if (on) 1f else 0.45f }
 

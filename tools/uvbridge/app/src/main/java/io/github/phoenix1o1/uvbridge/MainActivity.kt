@@ -41,6 +41,13 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // An old launcher icon pointing here: the app opens on its home screen.
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER)) {
+            startActivity(Intent(this, HomeActivity::class.java))
+            finish()
+            return
+        }
+        open = true
         // A flash must not be cut short by the screen going off.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -203,12 +210,16 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        open = false
         if (::bridge.isInitialized) bridge.stop()
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
 
     companion object {
+        /** UV Studio is on screen or behind another screen of the app. */
+        @Volatile var open = false
+
         private const val UV_STUDIO_HOST = "armel.github.io"
         private const val UV_STUDIO_ORIGIN = "https://$UV_STUDIO_HOST"
         private const val PICK_FILE = 1

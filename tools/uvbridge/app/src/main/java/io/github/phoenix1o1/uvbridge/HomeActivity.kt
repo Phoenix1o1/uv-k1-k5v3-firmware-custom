@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -61,11 +62,12 @@ class HomeActivity : Activity() {
     private lateinit var files: FileSaver
     private lateinit var library: Library
     private lateinit var scroll: ScrollView
-    private lateinit var chirpCard: View
+    private lateinit var chirpCard: LinearLayout
     /** "Install again": shown once the app keeps an asset pack. */
     private lateinit var againRow: View
     private lateinit var radioLine: TextView
     private lateinit var driverLine: TextView
+    private lateinit var driverWhy: TextView
     private lateinit var status: TextView
     private lateinit var progress: ProgressBar
     private val buttons = mutableListOf<View>()
@@ -113,52 +115,77 @@ class HomeActivity : Activity() {
     private fun buildLayout() {
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
-        // header: icon, name, version
+        // header: icon, name, what the app is for, version
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(4), 0, dp(4)) }
-        header.addView(ImageView(this).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        header.addView(ImageView(this).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams(dp(52), dp(52)))
         val names = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), 0, 0, 0) }
         names.addView(Ui.text(this, getString(R.string.app_name), 24f, bold = true))
-        names.addView(Ui.text(this, getString(R.string.home_tagline, packageManager.getPackageInfo(packageName, 0).versionName), 13f, R.color.muted))
+        names.addView(Ui.text(this, getString(R.string.home_tagline), 13f, R.color.muted))
+        names.addView(Ui.text(this, "v" + packageManager.getPackageInfo(packageName, 0).versionName, 12f, R.color.muted))
         header.addView(names)
         column.addView(header)
 
-        // status: radio, driver, progress and messages
+        // status: radio, progress and messages
         val statusCard = Ui.card(this)
         statusCard.addView(Ui.cardHead(this, R.drawable.ic_radio, getString(R.string.home_radio), null))
         radioLine = Ui.text(this, getString(R.string.home_not_connected), 14f).apply { setPadding(0, dp(10), 0, 0) }
-        driverLine = Ui.text(this, "", 13f, R.color.muted).apply { setPadding(0, dp(4), 0, 0) }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 1000; visibility = View.GONE }
         status = Ui.text(this, getString(R.string.home_hint), 13f, R.color.muted).apply {
             setPadding(0, dp(8), 0, 0); setTextIsSelectable(true)
         }
-        statusCard.addView(radioLine); statusCard.addView(driverLine)
+        statusCard.addView(radioLine)
         statusCard.addView(progress, Ui.lp(dp(10))); statusCard.addView(status)
         column.addView(statusCard, Ui.lp(dp(16)))
 
-        // UV Studio
-        column.addView(section(R.drawable.ic_studio, R.string.studio_title, R.string.studio_text,
-            action(R.string.studio_open, filled = true) { startActivity(Intent(this, MainActivity::class.java)) }))
+        // UV Studio, with its author
+        val studio = section(R.drawable.ic_studio, R.string.studio_title, R.string.studio_text,
+            action(R.string.studio_open, filled = true) { startActivity(Intent(this, MainActivity::class.java)) })
+        studio.addView(Ui.text(this, getString(R.string.studio_credit), 12f, R.color.muted).apply { setPadding(0, dp(10), 0, 0) })
+        column.addView(studio)
 
-        // CHIRP image
+        // CHIRP image, and the driver its layout follows
         chirpCard = section(R.drawable.ic_chirp, R.string.chirp_title, R.string.chirp_intro,
             action(R.string.chirp_download, filled = true) { download() },
             action(R.string.chirp_upload) { pickFile(PICK_IMAGE) },
             action(R.string.chirp_edit) { pickFile(PICK_EDIT) })
+        chirpCard.addView(Ui.divider(this), Ui.lp(dp(16)))
+        val driverRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(12), 0, 0) }
+        driverRow.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_driver)
+            imageTintList = android.content.res.ColorStateList.valueOf(Ui.color(this@HomeActivity, R.color.muted))
+        }, LinearLayout.LayoutParams(dp(20), dp(20)))
+        val driverTexts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0) }
+        driverLine = Ui.text(this, "", 14f, bold = true)
+        driverWhy = Ui.text(this, "", 12f, R.color.muted)
+        driverTexts.addView(driverLine); driverTexts.addView(driverWhy)
+        driverRow.addView(driverTexts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        chirpCard.addView(driverRow)
+        chirpCard.addView(Ui.buttonRow(this, action(R.string.drivers_manage) { manageDrivers() },
+            action(R.string.from_repo) { driverFromRepo() }, action(R.string.from_file) { pickFile(PICK_DRIVER) }))
         column.addView(chirpCard)
 
-        // firmware assets: for firmwares flashed from a file (UV Studio writes
-        // the assets itself when it flashes from the repository)
+        // Advanced, folded: firmware assets, only for firmwares flashed from a
+        // file (UV Studio writes the assets itself when it flashes from its list)
         val assets = section(R.drawable.ic_assets, R.string.assets_title, R.string.assets_text,
-            action(R.string.assets_install, filled = true) { pickFile(PICK_FIRMWARE) }) as LinearLayout
+            action(R.string.assets_install, filled = true) { pickFile(PICK_FIRMWARE) })
         againRow = Ui.buttonRow(this, action(R.string.assets_again) { installAssets(null) })
         assets.addView(againRow)
+        assets.visibility = View.GONE
+        val advanced = Ui.text(this, "", 14f, R.color.muted, bold = true).apply {
+            setPadding(dp(8), dp(14), dp(8), dp(6))
+            fun label() { text = getString(R.string.advanced) + if (assets.visibility == View.VISIBLE) "  ▴" else "  ▾" }
+            label()
+            setOnClickListener { assets.visibility = if (assets.visibility == View.VISIBLE) View.GONE else View.VISIBLE; label() }
+        }
+        column.addView(advanced, Ui.lp(dp(12)))
         column.addView(assets)
 
-        // CHIRP drivers
-        column.addView(section(R.drawable.ic_driver, R.string.drivers_title, R.string.drivers_text,
-            action(R.string.drivers_manage, filled = true) { manageDrivers() },
-            action(R.string.from_repo) { driverFromRepo() },
-            action(R.string.from_file) { pickFile(PICK_DRIVER) }))
+        // about: credits and licences
+        column.addView(Ui.text(this, getString(R.string.about_link), 14f, R.color.accent, bold = true).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(20), dp(8), dp(8))
+            setOnClickListener { startActivity(Intent(this@HomeActivity, AboutActivity::class.java)) }
+        }, Ui.lp(dp(8)))
 
         scroll = ScrollView(this).apply { addView(column); isFillViewport = true }
         Ui.keepClearOfBars(scroll, dp(16))
@@ -169,7 +196,7 @@ class HomeActivity : Activity() {
         Ui.button(this, getString(label), filled) { if (!busy) onClick() }.also { buttons += it }
 
     /** A card: head, then its buttons, the first one full width. */
-    private fun section(icon: Int, title: Int, text: Int, vararg actions: View): View {
+    private fun section(icon: Int, title: Int, text: Int, vararg actions: View): LinearLayout {
         val card = Ui.card(this)
         card.addView(Ui.cardHead(this, icon, getString(title), getString(text)))
         card.addView(Ui.buttonRow(this, actions[0]))
@@ -182,8 +209,12 @@ class HomeActivity : Activity() {
         againRow.visibility = if (library.packs().isEmpty()) View.GONE else View.VISIBLE
         val version = ChirpDriver.VERSION.find(lastFirmware)?.groupValues?.get(1) ?: ""
         val pick = library.pickDriver(version)
-        driverLine.text = getString(R.string.home_driver, pick.item.name, pick.why)
+        driverLine.text = getString(R.string.home_driver, driverName(pick.item))
+        driverWhy.text = (if (pick.item.isBuiltin) "" else pick.item.name + " · ") + pick.why
     }
+
+    private fun driverName(d: ChirpDriver) =
+        if (d.isBuiltin) getString(R.string.drivers_builtin) else "F4HWN ${d.firmwareVersion.ifEmpty { "?" }}"
 
     // ---- CHIRP image ----
 
@@ -271,7 +302,7 @@ class HomeActivity : Activity() {
         val rows = all.map { d ->
             val tag = if (d.name == current.name) "In use" else null
             if (d.isBuiltin) Ui.Row(getString(R.string.drivers_builtin), getString(R.string.drivers_builtin_text), tag)
-            else Ui.Row("F4HWN ${d.firmwareVersion.ifEmpty { "?" }}", d.name, tag)
+            else Ui.Row(driverName(d), d.name, tag)
         }
         AlertDialog.Builder(this).setTitle(R.string.drivers_title)
             .setAdapter(Ui.rows(this, rows)) { _, i -> driverOptions(all[i]) }

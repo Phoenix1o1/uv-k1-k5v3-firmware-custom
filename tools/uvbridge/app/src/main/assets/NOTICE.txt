@@ -1,0 +1,75 @@
+UV Bridge
+=========
+
+A companion Android app for the F4HWN Edition Fusion firmware for the
+Quansheng UV-K1 and UV-K5 V3:
+
+  https://github.com/armel/uv-k1-k5v3-firmware-custom
+
+UV Bridge is developed by Phoenix1o1 in tools/uvbridge of
+https://github.com/Phoenix1o1/uv-k1-k5v3-firmware-custom and is licensed
+under the Apache License, Version 2.0, like the firmware project
+(licenses/Apache-2.0.txt).
+
+It is not affiliated with Quansheng. Quansheng, UV-K1 and UV-K5 are
+names of their respective owners.
+
+
+UV Studio
+---------
+
+UV Studio, Copyright 2026 Armel FAUVEAU (F4HWN), licensed under the
+Apache License, Version 2.0, incorporating K5Viewer and UVTools2 by the
+same author.
+
+  https://armel.github.io/uvstudio/
+
+UV Bridge does not include UV Studio. It opens the live UV Studio site in
+a WebView and provides the Web Serial API that the site uses. All of UV
+Studio's features, its interface and its translations are the work of its
+author.
+
+
+F4HWN firmware
+--------------
+
+The serial programming protocol, the firmware asset pack format (FWA1 /
+FWAT) and the asset commands used by UV Bridge are those of the F4HWN
+firmware by Armel FAUVEAU (F4HWN), muzkr and contributors, based on the
+firmwares of Dual Tachyon and Egzumer, licensed under the Apache License,
+Version 2.0 (see the NOTICE file of the firmware project).
+
+
+CHIRP and the F4HWN CHIRP driver
+--------------------------------
+
+The CHIRP image format, and the way channels and settings are stored,
+follow CHIRP and its F4HWN driver for the UV-K1 & UV-K5 V3 (F4HWN), by
+F4HWN, JOC2 and Egzumer, based on the UV-K5 driver by Jacek Lipkowski
+(SQ5BPF) and on CHIRP by Dan Smith and contributors. CHIRP and the
+driver are licensed under the GNU General Public License.
+
+  https://chirpmyradio.com/
+  https://github.com/armel/uv-k1-k5v3-firmware-custom/releases
+
+UV Bridge does not include CHIRP or any driver file. Driver files are
+downloaded from the firmware releases (or loaded) at the user's request;
+the app reads their memory map and setting lists and never runs them.
+
+
+Libraries included in the app
+-----------------------------
+
+usb-serial-for-android 3.8.1
+  Copyright (c) 2011-2013 Google Inc.
+  Copyright (c) 2013 Mike Wakerly
+  MIT License (licenses/MIT-usb-serial-for-android.txt)
+  https://github.com/mik3y/usb-serial-for-android
+
+AndroidX WebKit, AndroidX Core and their AndroidX dependencies
+  The Android Open Source Project
+  Apache License, Version 2.0 (licenses/Apache-2.0.txt)
+
+Kotlin standard library
+  JetBrains s.r.o. and Kotlin contributors
+  Apache License, Version 2.0 (licenses/Apache-2.0.txt)

@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.phoenix1o1.uvbridge"
         minSdk = 30          // Android 11: WindowInsets.Type, insetsController
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.6.3"
+        versionCode = 13
+        versionName = "0.7.0"
     }
 
     buildTypes {
