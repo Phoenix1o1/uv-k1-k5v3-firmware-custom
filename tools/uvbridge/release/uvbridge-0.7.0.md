@@ -1,0 +1,4 @@
+- New home screen: UV Studio (credited to its author), CHIRP image with the driver in use and its buttons in the same card, firmware assets folded under Advanced, and About, credits & licences.
+- The app always opens on its home screen, also when the cable is plugged in (UV Studio stays in front if it is open, for flashing) and from old home-screen icons. Android asks once again which app to open for the cable.
+- About screen with credits (UV Studio by Armel FAUVEAU F4HWN, the F4HWN firmware, CHIRP and its F4HWN driver, usb-serial-for-android, AndroidX, Kotlin) and the notice and licence texts.
+- Same messages and fixes as 0.6.3 for Download / Upload.
