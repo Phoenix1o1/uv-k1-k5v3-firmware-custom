@@ -22,7 +22,8 @@
 
 /* Scan-list picker: during a memory scan, a short * opens a list of the scan
  * lists (ALL, MIX, then each list that holds a channel) over the main screen.
- * The scan goes on underneath; MENU moves it to the selected list. */
+ * The scan goes on underneath; MENU moves it to the selected list. F ticks
+ * several lists, which are then scanned together as the MIX selection. */
 
 #define SCAN_LIST_PICKER_TIMEOUT_500MS 20u   /* 10 s without a key */
 
