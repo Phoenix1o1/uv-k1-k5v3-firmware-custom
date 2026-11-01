@@ -19,10 +19,9 @@
  * F ticks lists to scan several of them: they become the MIX selection
  * (SCAN_LIST_MIX_MASK, the one the menu's MIX editor sets), and the scan
  * goes on at the first channel of the ticked list under the cursor, then
- * through the others in memory order. Once ticks have been changed, MENU,
- * EXIT or * applies them; while they are unchanged (e.g. the MIX lists
- * shown ticked when the picker reopens), MENU scans the row under the
- * cursor as without ticks.
+ * through the others in memory order. Changed ticks are applied only on
+ * purpose: by leaving with EXIT or *, or by MENU on the MIX row. MENU on
+ * any other row scans that row and leaves MIX as it was.
  *
  * Built like the action picker: SCAN_LIST_PICKER_ProcessKey() is called from
  * ProcessKey() (app.c), SCAN_LIST_PICKER_Draw() from UI_DisplayMain() and
@@ -167,17 +166,18 @@ static uint16_t picker_first_channel(uint8_t l)
     return found;
 }
 
-/* Scan the selected list, or the ticked ones: the same steps as the scan
- * key pressed during a scan (ACTION_Scan): show the new list's name, save it
- * with the resume state, go on with a channel of that list. */
-static void picker_apply(void)
+/* Scan the row under the cursor, or with use_ticks the ticked lists: the
+ * same steps as the scan key pressed during a scan (ACTION_Scan): show the
+ * new list's name, save it with the resume state, go on with a channel of
+ * that list. */
+static void picker_apply(bool use_ticks)
 {
-    /* ticks only count once changed here: unchanged MIX ticks must not keep
-     * MENU from choosing another row */
-    const uint8_t ticked = picker.ticks_changed ? picker_tick_count() : 0;
+    const uint8_t ticked = picker_tick_count();
     uint16_t start = 0xFFFF;
 
-    if (ticked >= 2) {
+    if (!use_ticks) {
+        gEeprom.SCAN_LIST_DEFAULT = picker.items[picker.cursor];
+    } else if (ticked >= 2) {
         /* several lists: save them as MIX, as the MIX editor does */
         const uint8_t item = picker.items[picker.cursor];
         uint8_t from = (item <= MR_CHANNELS_LIST && (picker.ticks & (1u << (item - 1u))))
@@ -197,7 +197,8 @@ static void picker_apply(void)
             if (picker.ticks & (1u << (l - 1u)))
                 gEeprom.SCAN_LIST_DEFAULT = l;
     } else {
-        gEeprom.SCAN_LIST_DEFAULT = picker.items[picker.cursor];
+        SCAN_LIST_PICKER_Close();   /* everything unticked: nothing to apply */
+        return;
     }
 
     SCAN_LIST_PICKER_Close();
@@ -250,9 +251,10 @@ bool SCAN_LIST_PICKER_ProcessKey(KEY_Code_t key, bool isPressed, bool isHeld)
             }
             return true;
 
-        case KEY_MENU:      /* short press, on release */
+        case KEY_MENU:      /* short press, on release: the row; on MIX, changed ticks */
             if (!isPressed && !isHeld)
-                picker_apply();
+                picker_apply(picker.ticks_changed &&
+                             picker.items[picker.cursor] == SCAN_LIST_MODE_MIX);
             return true;
 
         case KEY_F:         /* tick / untick */
@@ -264,7 +266,7 @@ bool SCAN_LIST_PICKER_ProcessKey(KEY_Code_t key, bool isPressed, bool isHeld)
         case KEY_STAR:      /* the key that opened it */
             if (!isPressed) {
                 if (picker.ticks_changed)   /* like the MIX editor: leaving saves */
-                    picker_apply();
+                    picker_apply(true);
                 else
                     SCAN_LIST_PICKER_Close();
             }
@@ -342,5 +344,7 @@ void SCAN_LIST_PICKER_Draw(void)
         }
     }
 
-    GUI_DisplaySmallest("F TICK  MENU SCAN  EXIT BACK", 1, 6 * 8 + 2, false, true);
+    GUI_DisplaySmallest(picker.ticks_changed ? "F TICK  MENU SCAN  EXIT MIX"
+                                             : "F TICK  MENU SCAN  EXIT BACK",
+                        1, 6 * 8 + 2, false, true);
 }
