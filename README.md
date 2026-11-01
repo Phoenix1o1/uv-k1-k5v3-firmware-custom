@@ -36,6 +36,11 @@ The picker is a firmware change behind the build flag
 `ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER`, based on `feature_update_v7`. It costs
 about 1.2 KB of flash where enabled, and nothing otherwise.
 
+Being tested on `testlab`, not yet proposed: **F ticks several lists** in the
+picker. They become the firmware's MIX selection, and the scan starts at the
+first channel of the ticked list under the cursor, then runs through the
+others.
+
 ### UV Bridge: an Android companion app
 
 **Branch [`uvbridge`](https://github.com/Phoenix1o1/uv-k1-k5v3-firmware-custom/tree/uvbridge/tools/uvbridge)**, folder `tools/uvbridge`.
@@ -72,20 +77,10 @@ cover testing v7 builds before then.
 ### Test builds
 
 **Branch [`testlab`](https://github.com/Phoenix1o1/uv-k1-k5v3-firmware-custom/tree/testlab)**:
-`feature_update_v7` as of 26 October (before ChannelBook), plus the
-scan-list picker, the earlier Channels app, the asset-loading script and a
-`Testlab` CMake preset (Fusion with the picker on). It is for testing on the
+the latest `feature_update_v7`, plus the scan-list picker with multi-list
+ticks, the asset-loading script and a `Testlab` CMake preset (Fusion with the
+picker on). Armel's ChannelBook app runs on it. It is for testing on the
 radio only and is not meant for upstream.
-
-### Finished or superseded
-
-- **Channels app and memory-channel API**: branch
-  [`channels-app`](https://github.com/Phoenix1o1/uv-k1-k5v3-firmware-custom/tree/channels-app),
-  proposed as [armel#727](https://github.com/armel/uv-k1-k5v3-firmware-custom/pull/727).
-  It was closed in favour of Armel's own **ChannelBook** app and memory API,
-  now in `feature_update_v7`. The branch stays for reference. Its
-  `Channels.app` uses a different API level 4 layout and **must not be run on
-  official v7 firmware**; use ChannelBook there.
 
 ## Credits
 
@@ -115,7 +110,7 @@ people:
 - **[usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android)**
   by Mike Wakerly (mik3y) and contributors (MIT): UV Bridge's USB serial support.
 - **Phoenix1o1**: the work in this fork, namely the scan-list picker, UV
-  Bridge, the asset-loading script, and the earlier Channels app.
+  Bridge and the asset-loading script.
 
 ## License
 
