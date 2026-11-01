@@ -34,12 +34,12 @@ number. None of them shows what the lists are called or what they hold.
 
 The picker is a firmware change behind the build flag
 `ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER`, based on `feature_update_v7`. It costs
-about 1.2 KB of flash where enabled, and nothing otherwise.
+about 1.7 KB of flash where enabled, and nothing otherwise.
 
-Being tested on `testlab`, not yet proposed: **F ticks several lists** in the
-picker. They become the firmware's MIX selection, and the scan starts at the
-first channel of the ticked list under the cursor, then runs through the
-others.
+The picker also shows and edits the firmware's **MIX** selection: ticked lists
+are the lists MIX scans, and F ticks or unticks one. It follows the menu's
+MIX editor, from inside the scan. MENU on MIX scans the ticked lists, and
+choosing a single list never changes the ticks.
 
 ### UV Bridge: an Android companion app
 
