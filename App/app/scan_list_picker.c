@@ -19,8 +19,10 @@
  * F ticks lists to scan several of them: they become the MIX selection
  * (SCAN_LIST_MIX_MASK, the one the menu's MIX editor sets), and the scan
  * goes on at the first channel of the ticked list under the cursor, then
- * through the others in memory order. MENU, or EXIT / * once ticks have
- * changed, applies them.
+ * through the others in memory order. Once ticks have been changed, MENU,
+ * EXIT or * applies them; while they are unchanged (e.g. the MIX lists
+ * shown ticked when the picker reopens), MENU scans the row under the
+ * cursor as without ticks.
  *
  * Built like the action picker: SCAN_LIST_PICKER_ProcessKey() is called from
  * ProcessKey() (app.c), SCAN_LIST_PICKER_Draw() from UI_DisplayMain() and
@@ -170,7 +172,9 @@ static uint16_t picker_first_channel(uint8_t l)
  * with the resume state, go on with a channel of that list. */
 static void picker_apply(void)
 {
-    const uint8_t ticked = picker_tick_count();
+    /* ticks only count once changed here: unchanged MIX ticks must not keep
+     * MENU from choosing another row */
+    const uint8_t ticked = picker.ticks_changed ? picker_tick_count() : 0;
     uint16_t start = 0xFFFF;
 
     if (ticked >= 2) {
