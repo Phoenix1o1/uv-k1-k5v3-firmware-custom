@@ -16,12 +16,13 @@
  * channel counts in place of the main screen. The scan keeps running.
  * UP/DOWN move, MENU scans the selected list, EXIT or * closes.
  *
- * F ticks lists to scan several of them: they become the MIX selection
- * (SCAN_LIST_MIX_MASK, the one the menu's MIX editor sets), and the scan
- * goes on at the first channel of the ticked list under the cursor, then
- * through the others in memory order. Changed ticks are applied only on
- * purpose: by leaving with EXIT or *, or by MENU on the MIX row. MENU on
- * any other row scans that row and leaves MIX as it was.
+ * The ticks are the MIX selection (SCAN_LIST_MIX_MASK, the one the menu's
+ * MIX editor sets), always shown. F ticks or unticks a list; as in that
+ * editor the last ticked list cannot be unticked. Changes are kept when the
+ * picker closes, whatever closes it. MENU on MIX scans the ticked lists.
+ * Leaving with EXIT or * while MIX is scanned applies changed ticks at once,
+ * from the ticked list under the cursor, then through the others in memory
+ * order.
  *
  * Built like the action picker: SCAN_LIST_PICKER_ProcessKey() is called from
  * ProcessKey() (app.c), SCAN_LIST_PICKER_Draw() from UI_DisplayMain() and
@@ -55,8 +56,9 @@ static struct {
     uint8_t  cursor;                 /* selected row */
     uint8_t  top;                    /* first row on screen */
     uint8_t  timeout_500ms;
-    uint32_t ticks;                  /* ticked lists, bit l-1 for list l */
+    uint32_t ticks;                  /* the MIX selection, bit l-1 for list l */
     bool     ticks_changed;
+    uint16_t in_every;               /* channels in every list (scanlist ALL) */
 } picker;
 
 static void picker_add(uint8_t item, uint16_t channels)
@@ -85,22 +87,28 @@ static void picker_build(void)
             in_list[att.scanlist]++;
     }
 
-    /* ALL scans every list; MIX the lists of SCAN_LIST_MIX_MASK. */
+    /* ALL scans every list; MIX is counted from the ticks (picker_mix_count) */
     uint16_t all = in_list[0];
-    uint16_t mix = gEeprom.SCAN_LIST_MIX_MASK ? in_list[0] : 0;
-    for (uint8_t l = 1; l <= MR_CHANNELS_LIST; l++) {
+    for (uint8_t l = 1; l <= MR_CHANNELS_LIST; l++)
         all += in_list[l];
-        if (gEeprom.SCAN_LIST_MIX_MASK & (1u << (l - 1u)))
-            mix += in_list[l];
-    }
 
+    picker.in_every = in_list[0];
     picker.count = 0;
     picker_add(SCAN_LIST_MODE_ALL, all);
-    if (mix)
-        picker_add(SCAN_LIST_MODE_MIX, mix);
+    picker_add(SCAN_LIST_MODE_MIX, 0);       /* row 1, always offered */
     for (uint8_t l = 1; l <= MR_CHANNELS_LIST; l++)
         if (in_list[l])                        /* empty lists cannot be scanned */
             picker_add(l, in_list[l] + in_list[0]);
+}
+
+/* MIX row count: the channels of the ticked lists, and those in every list. */
+static void picker_mix_count(void)
+{
+    uint16_t mix = picker.in_every;
+    for (uint8_t i = 2; i < picker.count; i++)
+        if (picker.ticks & (1u << (picker.items[i] - 1u)))
+            mix += picker.counts[i] - picker.in_every;
+    picker.counts[1] = mix;
 }
 
 /* Keep the cursor row on screen. */
@@ -124,30 +132,32 @@ void SCAN_LIST_PICKER_Open(void)
     picker.top = 0;
     picker_scroll();
 
-    /* while MIX is scanned its lists are ticked, so they can be changed */
-    picker.ticks = (gEeprom.SCAN_LIST_DEFAULT == SCAN_LIST_MODE_MIX)
-                 ? (gEeprom.SCAN_LIST_MIX_MASK & SCAN_LIST_MIX_MASK_ALL) : 0;
+    /* the ticks show the MIX selection, whatever is scanned (as the MIX
+     * editor, an empty one stands for all lists) */
+    picker.ticks = gEeprom.SCAN_LIST_MIX_MASK & SCAN_LIST_MIX_MASK_ALL;
+    if (picker.ticks == 0)
+        picker.ticks = SCAN_LIST_MIX_MASK_ALL;
     picker.ticks_changed = false;
+    picker_mix_count();
 
     picker.timeout_500ms = SCAN_LIST_PICKER_TIMEOUT_500MS;
     gScanListPickerOpen = true;
     gUpdateDisplay = true;
 }
 
+/* Whatever closes the picker keeps changed ticks: they are saved as MIX,
+ * after the key, as the menu's MIX editor saves them. */
 void SCAN_LIST_PICKER_Close(void)
 {
     if (!gScanListPickerOpen)
         return;
+    if (picker.ticks_changed) {
+        gEeprom.SCAN_LIST_MIX_MASK = picker.ticks;
+        gRequestSaveSettings = true;
+        picker.ticks_changed = false;
+    }
     gScanListPickerOpen = false;
     gUpdateDisplay = true;
-}
-
-static uint8_t picker_tick_count(void)
-{
-    uint8_t n = 0;
-    for (uint32_t m = picker.ticks; m; m &= m - 1u)
-        n++;
-    return n;
 }
 
 /* First channel of list l the scan reaches, in its direction: the place to
@@ -166,64 +176,56 @@ static uint16_t picker_first_channel(uint8_t l)
     return found;
 }
 
-/* Scan the row under the cursor, or with use_ticks the ticked lists: the
- * same steps as the scan key pressed during a scan (ACTION_Scan): show the
- * new list's name, save it with the resume state, go on with a channel of
- * that list. */
-static void picker_apply(bool use_ticks)
+/* MENU: scan the row under the cursor (a list, ALL, or MIX with the ticks):
+ * the same steps as the scan key pressed during a scan (ACTION_Scan): show
+ * the new list's name, save it with the resume state, go on with the next
+ * channel of that list. */
+static void picker_scan_row(void)
 {
-    const uint8_t ticked = picker_tick_count();
-    uint16_t start = 0xFFFF;
-
-    if (!use_ticks) {
-        gEeprom.SCAN_LIST_DEFAULT = picker.items[picker.cursor];
-    } else if (ticked >= 2) {
-        /* several lists: save them as MIX, as the MIX editor does */
-        const uint8_t item = picker.items[picker.cursor];
-        uint8_t from = (item <= MR_CHANNELS_LIST && (picker.ticks & (1u << (item - 1u))))
-                     ? item : 0;
-        for (uint8_t i = 0; !from && i < picker.count; i++)   /* else the first ticked row */
-            if (picker.items[i] <= MR_CHANNELS_LIST &&
-                (picker.ticks & (1u << (picker.items[i] - 1u))))
-                from = picker.items[i];
-
-        gEeprom.SCAN_LIST_MIX_MASK = picker.ticks;
-        gEeprom.SCAN_LIST_DEFAULT  = SCAN_LIST_MODE_MIX;
-        gRequestSaveSettings = true;   /* saved after the key, like the menu */
-        if (from)
-            start = picker_first_channel(from);
-    } else if (ticked == 1) {
-        for (uint8_t l = 1; l <= MR_CHANNELS_LIST; l++)
-            if (picker.ticks & (1u << (l - 1u)))
-                gEeprom.SCAN_LIST_DEFAULT = l;
-    } else {
-        SCAN_LIST_PICKER_Close();   /* everything unticked: nothing to apply */
-        return;
-    }
-
+    gEeprom.SCAN_LIST_DEFAULT = picker.items[picker.cursor];
     SCAN_LIST_PICKER_Close();
     UI_MAIN_NotifyScanListChanged();
 #ifdef ENABLE_FEAT_F4HWN_RESUME_STATE
     SETTINGS_WriteCurrentState();
 #endif
-    if (gScanStateDir == SCAN_OFF)   /* the scan may have stopped since the last tick */
-        return;
-    if (start != 0xFFFF)
-        CHFRSCANNER_ResumeAt(start, gScanStateDir);
-    else
+    if (gScanStateDir != SCAN_OFF)   /* the scan may have stopped since the last tick */
         CHFRSCANNER_ManualResume(gScanStateDir);
 }
 
-/* F: tick or untick the list under the cursor (ALL and MIX cannot be). */
+/* EXIT / *: close. If MIX is scanned and its ticks changed, go on with the
+ * new set from the ticked list under the cursor (else from where it is). */
+static void picker_leave(void)
+{
+    const bool remix = picker.ticks_changed &&
+                       gEeprom.SCAN_LIST_DEFAULT == SCAN_LIST_MODE_MIX;
+    const uint8_t item = picker.items[picker.cursor];
+
+    SCAN_LIST_PICKER_Close();
+    if (!remix || gScanStateDir == SCAN_OFF)
+        return;
+    if (item <= MR_CHANNELS_LIST && (gEeprom.SCAN_LIST_MIX_MASK & (1u << (item - 1u)))) {
+        const uint16_t start = picker_first_channel(item);
+        if (start != 0xFFFF) {
+            CHFRSCANNER_ResumeAt(start, gScanStateDir);
+            return;
+        }
+    }
+    CHFRSCANNER_ManualResume(gScanStateDir);
+}
+
+/* F: tick or untick the list under the cursor. ALL and MIX cannot be, nor
+ * (as in the MIX editor) the last ticked list: MIX is never empty. */
 static void picker_tick(void)
 {
-    const uint8_t item = picker.items[picker.cursor];
-    if (item > MR_CHANNELS_LIST) {
+    const uint8_t  item = picker.items[picker.cursor];
+    const uint32_t bit  = 1u << (item - 1u);
+    if (item > MR_CHANNELS_LIST || picker.ticks == bit) {
         gBeepToPlay = BEEP_500HZ_60MS_DOUBLE_BEEP_OPTIONAL;
         return;
     }
-    picker.ticks ^= 1u << (item - 1u);
+    picker.ticks ^= bit;
     picker.ticks_changed = true;
+    picker_mix_count();
     gBeepToPlay = BEEP_1KHZ_60MS_OPTIONAL;
     gUpdateDisplay = true;
 }
@@ -251,10 +253,9 @@ bool SCAN_LIST_PICKER_ProcessKey(KEY_Code_t key, bool isPressed, bool isHeld)
             }
             return true;
 
-        case KEY_MENU:      /* short press, on release: the row; on MIX, changed ticks */
+        case KEY_MENU:      /* short press, on release */
             if (!isPressed && !isHeld)
-                picker_apply(picker.ticks_changed &&
-                             picker.items[picker.cursor] == SCAN_LIST_MODE_MIX);
+                picker_scan_row();
             return true;
 
         case KEY_F:         /* tick / untick */
@@ -264,12 +265,8 @@ bool SCAN_LIST_PICKER_ProcessKey(KEY_Code_t key, bool isPressed, bool isHeld)
 
         case KEY_EXIT:
         case KEY_STAR:      /* the key that opened it */
-            if (!isPressed) {
-                if (picker.ticks_changed)   /* like the MIX editor: leaving saves */
-                    picker_apply(true);
-                else
-                    SCAN_LIST_PICKER_Close();
-            }
+            if (!isPressed)
+                picker_leave();
             return true;
 
         case KEY_PTT:       /* never delay TX: close and let PTT through */
@@ -344,7 +341,5 @@ void SCAN_LIST_PICKER_Draw(void)
         }
     }
 
-    GUI_DisplaySmallest(picker.ticks_changed ? "F TICK  MENU SCAN  EXIT MIX"
-                                             : "F TICK  MENU SCAN  EXIT BACK",
-                        1, 6 * 8 + 2, false, true);
+    GUI_DisplaySmallest("F TICK  MENU SCAN  EXIT BACK", 1, 6 * 8 + 2, false, true);
 }
