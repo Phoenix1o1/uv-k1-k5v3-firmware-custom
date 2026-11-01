@@ -518,7 +518,7 @@ static const uint8_t CatAudio[]   = {
     MENU_SET_VOL,
 #endif
 #ifdef ENABLE_FEAT_F4HWN_AUDIO
-    MENU_SET_AUD,
+    MENU_SET_AUD, MENU_SET_RXG,
 #endif
 };
 static const uint8_t CatRadio[]   = { MENU_SQL, MENU_STE, MENU_RP_STE, MENU_ROGER, MENU_VOX, MENU_TDR };
@@ -1698,6 +1698,14 @@ void UI_DisplayMenu(void)
                 else {
                     FW_ASSETS_STRCPY(String, gSubMenu_SET_AUD_FM, gSubMenuSelection);
                     strcpy(top_right_badge, "FM");
+                }
+                break;
+
+            case MENU_SET_RXG:
+                FW_ASSETS_STRCPY(String, gSubMenu_OFF_ON, gSubMenuSelection);
+                if (RADIO_IsRxCompanderOn(gTxVfo)) {   // forced ON by the RX expander
+                    strcpy(top_right_badge, "COMPND");
+                    top_right_badge_line = 5;
                 }
                 break;
         #endif
