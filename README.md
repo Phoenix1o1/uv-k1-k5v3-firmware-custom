@@ -24,7 +24,8 @@ Each piece of work lives on its own branch.
 ### Scan-list picker: choose the list to scan from a menu
 
 **Branch [`scan-list-picker`](https://github.com/Phoenix1o1/uv-k1-k5v3-firmware-custom/tree/scan-list-picker)**.
-Proposed upstream as [armel#733](https://github.com/armel/uv-k1-k5v3-firmware-custom/pull/733) (open).
+Proposed upstream as [armel#733](https://github.com/armel/uv-k1-k5v3-firmware-custom/pull/733) (open),
+as a single commit on `feature_update_v7`. Tested on a UV-K1(8).
 
 During a memory scan, a short press on `*` opens a list of the scan lists
 over the main screen, with their names and channel counts. UP/DOWN and MENU
@@ -36,10 +37,19 @@ The picker is a firmware change behind the build flag
 `ENABLE_FEAT_F4HWN_SCAN_LIST_PICKER`, based on `feature_update_v7`. It costs
 about 1.7 KB of flash where enabled, and nothing otherwise.
 
-The picker also shows and edits the firmware's **MIX** selection: ticked lists
-are the lists MIX scans, and F ticks or unticks one. It follows the menu's
-MIX editor, from inside the scan. MENU on MIX scans the ticked lists, and
-choosing a single list never changes the ticks.
+The picker also shows and edits the firmware's **MIX** selection (the set of
+lists MIX scans), following MIX's own rules:
+
+- The ticks *are* the saved MIX selection, the same one the menu's
+  SList → MIX editor, CHIRP and the `25` shortcut use. They are shown
+  whatever is being scanned.
+- **F** ticks or unticks a list. The change is kept however the picker
+  closes. As in the MIX editor, the last ticked list can't be unticked.
+- **MENU** chooses what to scan: a list, ALL, or MIX (the ticked lists).
+  Choosing a list never changes the ticks, just as SList and the MIX
+  editor are separate in the menu.
+- While MIX is scanned, **EXIT** after changing the ticks applies them at
+  once, starting from the ticked list under the cursor.
 
 ### UV Bridge: an Android companion app
 
